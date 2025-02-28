@@ -413,6 +413,33 @@ button:disabled {
   border-color: var(--accent-gold);
 }
 
+.tts-button {
+    margin-top: 10px;
+    padding: 8px;
+    background-color: #444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .tts-button.tts-active {
+    background-color: #d9534f;
+  }
+  
+  .tts-button:hover {
+    background-color: #555;
+  }
+  
+  .tts-button.tts-active:hover {
+    background-color: #c9302c;
+  }
+  
 /* Media Queries */
 @media (min-width: 768px) {
   .game-layout {

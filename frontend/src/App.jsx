@@ -45,6 +45,23 @@ const api = {
   }
 };
 
+// Speaker Icons as SVG Components
+const SpeakerIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+  </svg>
+);
+
+const SpeakerMuteIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+    <line x1="23" y1="9" x2="17" y2="15"></line>
+    <line x1="17" y1="9" x2="23" y2="15"></line>
+  </svg>
+);
+
 // App Component
 function App() {
   // Game state
@@ -67,6 +84,7 @@ function App() {
     musicUrl: null
   });
   const [currentAction, setCurrentAction] = useState(null);
+  const [activeTTS, setActiveTTS] = useState(null); // Track which story segment is being spoken
   const storyRef = useRef(null);
   const speechSynthesisRef = useRef(null);
   
@@ -95,37 +113,14 @@ function App() {
     }
   }, [gameState.storyProgress]);
   
-  // Text-to-speech for new story segments
+  // Clean up speech synthesis when component unmounts
   useEffect(() => {
-    if (gameState.settings.enableTTS && gameState.storyProgress.length > 0) {
-      const lastStory = gameState.storyProgress[gameState.storyProgress.length - 1];
-      if (lastStory && lastStory.text && !lastStory.spoken) {
-        // Mark as spoken to prevent multiple readings
-        setGameState(prev => {
-          const newProgress = [...prev.storyProgress];
-          newProgress[newProgress.length - 1] = { ...newProgress[newProgress.length - 1], spoken: true };
-          return { ...prev, storyProgress: newProgress };
-        });
-        
-        if (window.speechSynthesis) {
-          // Cancel any ongoing speech
-          window.speechSynthesis.cancel();
-          
-          // Create new utterance
-          const utterance = new SpeechSynthesisUtterance(lastStory.text);
-          utterance.rate = 0.9; // Slightly slower for clarity
-          speechSynthesisRef.current = utterance;
-          window.speechSynthesis.speak(utterance);
-        }
-      }
-    }
-    
     return () => {
-      if (window.speechSynthesis && speechSynthesisRef.current) {
+      if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
     };
-  }, [gameState.storyProgress, gameState.settings.enableTTS]);
+  }, []);
   
   // Handle setup screen settings
   const handleSettingsChange = (setting, value) => {
@@ -133,6 +128,42 @@ function App() {
       ...prev,
       settings: { ...prev.settings, [setting]: value }
     }));
+  };
+  
+  // Text-to-speech toggle function
+  const toggleTTS = (index) => {
+    // If speech synthesis is not available, return
+    if (!window.speechSynthesis) return;
+    
+    // If this is the currently active TTS segment
+    if (activeTTS === index) {
+      // Stop the speech
+      window.speechSynthesis.cancel();
+      setActiveTTS(null);
+      return;
+    }
+    
+    // If another TTS is active, stop it
+    if (activeTTS !== null) {
+      window.speechSynthesis.cancel();
+    }
+    
+    // Start speaking the text from this segment
+    const storySegment = gameState.storyProgress[index];
+    if (storySegment && storySegment.text) {
+      const utterance = new SpeechSynthesisUtterance(storySegment.text);
+      utterance.rate = 0.9; // Slightly slower for clarity
+      
+      // Set up event listener for when speech ends
+      utterance.onend = () => {
+        setActiveTTS(null);
+      };
+      
+      // Store reference and start speaking
+      speechSynthesisRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+      setActiveTTS(index);
+    }
   };
   
   // Navigate to character creation
@@ -442,7 +473,6 @@ function App() {
           {gameState.storyProgress.map((segment, index) => (
             <div key={index} className="story-segment">
               <div className="story-text">
-        
                 {segment.player && segment.action && (
                   <div className="player-action">
                     <div className="player-icon">
@@ -459,6 +489,18 @@ function App() {
                   </div>
                 )}
                 <p>{segment.text}</p>
+                
+                {/* TTS Button with speaker icons */}
+                {gameState.settings.enableTTS && segment.text && (
+                  <button 
+                    className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
+                    onClick={() => toggleTTS(index)}
+                    title={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                    aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                  >
+                    {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                  </button>
+                )}
               </div>
               {segment.image && (
                 <div className="story-image">
