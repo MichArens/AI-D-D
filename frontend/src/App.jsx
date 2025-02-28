@@ -448,7 +448,6 @@ function App() {
               )}
               
               <div className="story-text">
-                <p>{segment.text}</p>
                 
                 {segment.player && segment.action && (
                   <div className="player-action">
@@ -465,6 +464,7 @@ function App() {
                     <p><strong>{segment.player}</strong> chose to {segment.action}</p>
                   </div>
                 )}
+                <p>{segment.text}</p>
               </div>
             </div>
           ))}
