@@ -179,7 +179,7 @@ function App() {
   // Check if all characters are complete
   const areCharactersComplete = () => {
     return gameState.characters.every(char => 
-      char.name && char.race && char.characterClass
+      char.name && char.race && char.characterClass && char.gender
     );
   };
   
@@ -392,6 +392,18 @@ function App() {
                 {characterOptions?.classes?.map(cls => (
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Gender:</label>
+              <select
+                value={character.gender || ''}
+                onChange={(e) => handleCharacterChange(index, 'gender', e.target.value)}
+              >
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
               </select>
             </div>
           </div>

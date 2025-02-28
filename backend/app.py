@@ -60,6 +60,7 @@ class PlayerCharacter(BaseModel):
     name: str
     race: Race
     characterClass: CharacterClass
+    gender: str
     playerIndex: int
     icon: Optional[str] = None  # Base64 encoded image
 
@@ -174,7 +175,7 @@ async def generate_character_options():
 async def generate_character_icon(request: CharacterIconRequest):
     """Generate a character icon based on character details"""
     character = request.character
-    prompt = f"Portrait of a {character.race} {character.characterClass} named {character.name} in a fantasy D&D style"
+    prompt = f"Portrait of a {character.race} {character.characterClass}, {character.gender} named {character.name} in a fantasy D&D style"
     
     try:
         icon_base64 = await generate_image(prompt)
@@ -190,7 +191,7 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     # Create character description for prompt
     character_descriptions = []
     for char in game_state.characters:
-        character_descriptions.append(f"{char.name} the {char.race} {char.characterClass}")
+        character_descriptions.append(f"{char.name} the {char.race} {char.characterClass}, {char.gender}")
     
     party_description = ", ".join(character_descriptions)
     
@@ -199,7 +200,7 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     You are the Dungeon Master for a new D&D adventure. Create an engaging opening scene for a party consisting of:
     {party_description}
     
-    Provide a vivid description of the initial setting and situation in 3-4 paragraphs.
+    Provide a vivid description of the initial setting and situation in 3-4 paragraphs, making sure to include their genders.
     Then, generate exactly 3 possible actions that the first player ({game_state.characters[0].name}) could take.
     Format your response as follows:
     
@@ -316,9 +317,9 @@ async def take_action(request: ActionRequest):
     Story so far:
     {story_history}
     
-    Current player {current_player.name} (a {current_player.race} {current_player.characterClass}) chose to: {chosen_action}
+    Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
     
-    Continue the story with what happens next according to the current player chose, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}).
+    Continue the story with what happens next according to the current player chose, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}, {next_player.gender}).
     
     Format your response as follows:
     
