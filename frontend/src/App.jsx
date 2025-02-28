@@ -441,14 +441,8 @@ function App() {
         <div className="story-container" ref={storyRef}>
           {gameState.storyProgress.map((segment, index) => (
             <div key={index} className="story-segment">
-              {segment.image && (
-                <div className="story-image">
-                  <img src={`data:image/png;base64,${segment.image}`} alt="Scene" />
-                </div>
-              )}
-              
               <div className="story-text">
-                
+        
                 {segment.player && segment.action && (
                   <div className="player-action">
                     <div className="player-icon">
@@ -466,6 +460,11 @@ function App() {
                 )}
                 <p>{segment.text}</p>
               </div>
+              {segment.image && (
+                <div className="story-image">
+                  <img src={`data:image/png;base64,${segment.image}`} alt="Scene" />
+                </div>
+              )}
             </div>
           ))}
           {/* End of story segments mapping */}
