@@ -439,7 +439,23 @@ button:disabled {
   .tts-button.tts-active:hover {
     background-color: #c9302c;
   }
+
+  .highlighted-word {
+    position: relative;
+  }
   
+  .highlighted-word::after {
+    content: "";
+    position: absolute;
+    left: -2px;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    background-color: #ffd700;
+    z-index: -1;
+    border-radius: 3px;
+  }
+
 /* Media Queries */
 @media (min-width: 768px) {
   .game-layout {

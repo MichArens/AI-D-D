@@ -131,7 +131,8 @@ function App() {
   };
   
   // Text-to-speech toggle function
-  const toggleTTS = (index) => {
+  // Replace your existing toggleTTS function with this:
+const toggleTTS = (index) => {
     // If speech synthesis is not available, return
     if (!window.speechSynthesis) return;
     
@@ -148,24 +149,64 @@ function App() {
       window.speechSynthesis.cancel();
     }
     
-    // Start speaking the text from this segment
-    const storySegment = gameState.storyProgress[index];
-    if (storySegment && storySegment.text) {
-      const utterance = new SpeechSynthesisUtterance(storySegment.text);
-      utterance.rate = 0.9; // Slightly slower for clarity
+    // Just set the active TTS index - the component will handle the speech
+    setActiveTTS(index);
+  };
+  
+  // Place this after your SpeakerMuteIcon component but before the App function
+const HighlightedText = ({ text, activeTTS, isPlaying }) => {
+    const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+    const words = text.split(/\s+/);
+    const utteranceRef = useRef(null);
+    
+    useEffect(() => {
+      if (!isPlaying) {
+        setCurrentWordIndex(-1);
+        return;
+      }
       
-      // Set up event listener for when speech ends
+      // Initialize speech synthesis with word boundary detection
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9; // Match your existing rate
+      
+      // Track word boundaries
+      utterance.onboundary = (event) => {
+        if (event.name === 'word') {
+          // Calculate which word we're on
+          const upToIndex = text.substring(0, event.charIndex).split(/\s+/).length - 1;
+          setCurrentWordIndex(upToIndex);
+        }
+      };
+      
       utterance.onend = () => {
-        setActiveTTS(null);
+        setCurrentWordIndex(-1);
       };
       
       // Store reference and start speaking
-      speechSynthesisRef.current = utterance;
+      utteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
-      setActiveTTS(index);
-    }
+      
+      return () => {
+        window.speechSynthesis.cancel();
+      };
+    }, [isPlaying, text]);
+    
+    return (
+      <p>
+        {words.map((word, index) => (
+          <React.Fragment key={index}>
+            <span 
+              className={currentWordIndex === index ? "highlighted-word" : ""}
+            >
+              {word}
+            </span>
+            {index < words.length - 1 ? ' ' : ''}
+          </React.Fragment>
+        ))}
+      </p>
+    );
   };
-  
+
   // Navigate to character creation
   const handleStartSetup = async () => {
     setLoading(true);
@@ -488,7 +529,12 @@ function App() {
                     <p><strong>{segment.player}</strong> chose to {segment.action}</p>
                   </div>
                 )}
-                <p>{segment.text}</p>
+                
+                <HighlightedText 
+                    text={segment.text} 
+                    activeTTS={activeTTS} 
+                    isPlaying={activeTTS === index} 
+                />
                 
                 {/* TTS Button with speaker icons */}
                 {gameState.settings.enableTTS && segment.text && (
