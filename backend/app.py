@@ -298,9 +298,10 @@ async def take_action(request: ActionRequest):
         raise HTTPException(status_code=400, detail=f"Invalid choice ID: {choice_id}")
     
     # Calculate next player's index
+    print("game_state.characters", game_state.characters)
     next_player_idx = (current_player_idx + 1) % len(game_state.characters)
     next_player = game_state.characters[next_player_idx]
-    
+    print("next_player", next_player)
     # Create prompt for generating the next story segment
     # Include full story history for context
     story_history = ""
@@ -317,7 +318,7 @@ async def take_action(request: ActionRequest):
     
     Current player {current_player.name} (a {current_player.race} {current_player.characterClass}) chose to: {chosen_action}
     
-    Continue the story with what happens next, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}).
+    Continue the story with what happens next according to the current player chose, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}).
     
     Format your response as follows:
     
