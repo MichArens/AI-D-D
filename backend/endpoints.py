@@ -1,9 +1,7 @@
 from fastapi import HTTPException, BackgroundTasks
-from models import GameState, ActionRequest, CharacterIconRequest, Chapter
+from models import GameState, ActionRequest, CharacterIconRequest, Chapter, NewChapterRequest
 from ai_services import generate_text, generate_image, generate_music
 import random
-from pydantic import BaseModel
-from typing import Dict, Any
 import logging
 import traceback
 
@@ -448,22 +446,6 @@ async def get_available_models():
         # Return a default list if Ollama isn't available
         return {"models": ["llama3", "mistral", "wizard-mega"]}
 
-# Update the NewChapterRequest model to be more flexible with input
-from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
-
-# New request model for starting a new chapter
-class NewChapterRequest(BaseModel):
-    gameState: Dict[str, Any]
-    nextChapterTitle: str
-    
-    class Config:
-        # Make the model more permissive with extra fields
-        extra = "ignore"
-        # Allow coercing types when possible
-        arbitrary_types_allowed = True
-
-# Improve the start_new_chapter function
 async def start_new_chapter(request: NewChapterRequest):
     """Generate the first segment of a new chapter"""
     try:

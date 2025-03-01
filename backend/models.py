@@ -69,3 +69,13 @@ class StoryResponse(BaseModel):
 
 class CharacterIconRequest(BaseModel):
     character: PlayerCharacter
+    
+class NewChapterRequest(BaseModel):
+    gameState: Dict[str, Any]
+    nextChapterTitle: str
+    
+    class Config:
+        # Make the model more permissive with extra fields
+        extra = "ignore"
+        # Allow coercing types when possible
+        arbitrary_types_allowed = True
