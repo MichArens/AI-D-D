@@ -239,13 +239,29 @@ async def take_action(request: ActionRequest):
             if "STORY:" in response_text and "NEXT CHAPTER:" in response_text:
                 story_part = response_text.split("STORY:")[1].split("NEXT CHAPTER:")[0].strip()
                 next_chapter_title = response_text.split("NEXT CHAPTER:")[1].strip()
-                next_chapter_title = next_chapter_title.strip().strip('"').strip("'")
+                # Improved title cleaning
+                next_chapter_title = next_chapter_title.split("\n")[0].strip()
+                next_chapter_title = next_chapter_title.strip('"').strip("'")
+                # Limit title length to avoid story content in title
+                if len(next_chapter_title) > 50:  # Reasonable max length for a title
+                    next_chapter_title = next_chapter_title[:50].strip()
             else:
                 # Fallback parsing
                 parts = response_text.split("\n\n")
                 story_part = parts[0] if parts else response_text
                 if len(parts) > 1:
-                    next_chapter_title = parts[-1].strip().strip('"').strip("'")[:30]
+                    # Use a more conservative approach for title extraction
+                    potential_title = parts[-1].strip().strip('"').strip("'")
+                    # If the potential title is too long, it's likely part of the story
+                    if len(potential_title) <= 50:
+                        next_chapter_title = potential_title
+                    else:
+                        # Generate a generic title
+                        next_chapter_title = f"Chapter {current_chapter_idx + 2}"
+            
+            # Additional safeguard to ensure title is reasonable
+            if len(next_chapter_title) < 3 or len(next_chapter_title) > 50:
+                next_chapter_title = f"Chapter {current_chapter_idx + 2}"
             
             # Generate chapter summary
             summary_prompt = f"""

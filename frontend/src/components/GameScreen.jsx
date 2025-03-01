@@ -29,6 +29,13 @@ const GameScreen = ({
   
   // Check if chapters are available
   const hasChapters = gameState.chapters && gameState.chapters.length > 0;
+
+  // Function to format chapter titles - keep them short
+  const formatChapterTitle = (title) => {
+    if (!title) return "Adventure";
+    if (title.length > 50) return title.substring(0, 50) + "...";
+    return title;
+  };
   
   return (
     <div className="game-screen">
@@ -36,7 +43,7 @@ const GameScreen = ({
       <div className="sticky-chapter-header">
         <h2>
           {viewingChapter ? (
-            <>Chapter {viewingChapterIndex + 1}: {viewingChapter.title || "Adventure"}</>
+            <>Chapter {viewingChapterIndex + 1}: {formatChapterTitle(viewingChapter.title)}</>
           ) : (
             <>Chapter 1: Adventure Begins</>
           )}
@@ -56,7 +63,7 @@ const GameScreen = ({
                   onClick={() => handleViewChapter(index)}
                 >
                   {/* Only show chapter title in sidebar */}
-                  <h4>Chapter {index + 1}: {chapter.title || "Chapter"}</h4>
+                  <h4>Chapter {index + 1}: {formatChapterTitle(chapter.title || "Chapter")}</h4>
                 </div>
               ))
             ) : (

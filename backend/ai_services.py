@@ -10,6 +10,10 @@ SUNO_API_KEY = os.environ.get("SUNO_API_KEY", "")  # Get from environment variab
 async def generate_text(prompt: str, model: str = "llama3"):
     """Generate text using Ollama API"""
     try:
+        # Add a formatting reminder for chapter titles
+        if "NEXT CHAPTER:" in prompt:
+            prompt += "\n\nNote: The NEXT CHAPTER title should be brief (3-7 words) and on its own line."
+            
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{OLLAMA_BASE_URL}/generate",
