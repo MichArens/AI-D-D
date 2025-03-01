@@ -37,12 +37,22 @@ class PlayerCharacter(BaseModel):
     playerIndex: int
     icon: Optional[str] = None  # Base64 encoded image
 
+class Chapter(BaseModel):
+    id: int
+    title: str
+    summary: str = ""
+    image: Optional[str] = None  # Base64 encoded image
+    segments: List[int] = []  # Indices of story segments in this chapter
+
 class GameState(BaseModel):
     settings: GameSettings
     characters: List[PlayerCharacter] = []
     storyProgress: List[Dict[str, Any]] = []
     currentPlayerIndex: int = 0
     musicUrl: Optional[str] = None
+    chapters: List[Chapter] = []
+    currentChapterIndex: int = 0
+    roundsInCurrentChapter: int = 0
 
 class ActionChoice(BaseModel):
     id: int

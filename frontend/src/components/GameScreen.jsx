@@ -4,12 +4,53 @@ import SpeakerIcon from './SpeakerIcon';
 import SpeakerMuteIcon from './SpeakerMuteIcon';
 
 const GameScreen = ({ gameState, setGameState, handleActionChoice, loading, error, currentAction, activeTTS, toggleTTS, storyRef }) => {
+  // Current chapter title for the header
+  const currentChapter = gameState.chapters && gameState.chapters[gameState.currentChapterIndex];
+  
   return (
     <div className="game-screen">
+      {/* Main chapter header at top of screen */}
+      {currentChapter && (
+        <div className="main-chapter-header">
+          <h2>Chapter {gameState.currentChapterIndex + 1}: {currentChapter.title}</h2>
+        </div>
+      )}
+      
       <div className="game-layout">
+        <div className="chapters-sidebar">
+          <h3>Chapters</h3>
+          {gameState.chapters && gameState.chapters.map((chapter, index) => (
+            <div 
+              key={index} 
+              className={`chapter-item ${index === gameState.currentChapterIndex ? 'active-chapter' : ''}`}
+            >
+              <h4>Chapter {index + 1}: {chapter.title}</h4>
+              {chapter.image && (
+                <div className="chapter-image">
+                  <img src={`data:image/png;base64,${chapter.image}`} alt={chapter.title} />
+                </div>
+              )}
+              {chapter.summary && <p>{chapter.summary}</p>}
+            </div>
+          ))}
+        </div>
+
         <div className="story-container" ref={storyRef}>
           {gameState.storyProgress.map((segment, index) => (
-            <div key={index} className="story-segment">
+            <div 
+              key={index} 
+              className={`story-segment ${segment.chapterId !== undefined && 
+                segment.chapterId !== (gameState.storyProgress[index-1]?.chapterId || -1) ? 
+                'new-chapter' : ''}`}
+            >
+              {segment.chapterId !== undefined && 
+               segment.chapterId !== (gameState.storyProgress[index-1]?.chapterId || -1) && 
+               gameState.chapters && gameState.chapters[segment.chapterId] && (
+                <div className="chapter-header">
+                  <h3>Chapter {segment.chapterId + 1}: {gameState.chapters[segment.chapterId].title}</h3>
+                </div>
+              )}
+              
               <div className="story-text">
                 {segment.player && segment.action && (
                   <div className="player-action">
@@ -56,6 +97,23 @@ const GameScreen = ({ gameState, setGameState, handleActionChoice, loading, erro
         </div>
         
         <div className="action-panel">
+          {/* Current chapter info */}
+          {currentChapter && (
+            <div className="current-chapter-info">
+              <h3>Chapter {gameState.currentChapterIndex + 1}</h3>
+              <h4>{currentChapter.title}</h4>
+              <div className="chapter-progress">
+                <span className="progress-text">Round {gameState.roundsInCurrentChapter + 1}/3</span>
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill" 
+                    style={{ width: `${(gameState.roundsInCurrentChapter / 3) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="current-player">
             {gameState.characters[gameState.currentPlayerIndex] && (
               <>

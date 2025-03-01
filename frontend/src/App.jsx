@@ -197,10 +197,44 @@ function App() {
         };
         newStoryProgress.push(newStory);
         
+        // Handle chapter transitions
+        let updatedChapters = [...prev.chapters];
+        let nextChapterIndex = prev.currentChapterIndex;
+        let nextRoundsInChapter = response.roundsInChapter || 0;
+        
+        if (response.chapterEnded) {
+          // Update current chapter with summary and image
+          if (updatedChapters[prev.currentChapterIndex]) {
+            updatedChapters[prev.currentChapterIndex] = {
+              ...updatedChapters[prev.currentChapterIndex],
+              summary: response.chapterSummary || "",
+              image: response.chapterImage
+            };
+          }
+          
+          // Add new chapter
+          if (response.nextChapter) {
+            const newChapter = {
+              id: response.nextChapter.id,
+              title: response.nextChapter.title,
+              summary: "",
+              segments: [newStoryProgress.length - 1]  // Start with the new segment
+            };
+            updatedChapters.push(newChapter);
+            nextChapterIndex = response.nextChapter.id;
+          }
+        } else if (prev.chapters[prev.currentChapterIndex]) {
+          // Add new segment to current chapter
+          updatedChapters[prev.currentChapterIndex].segments.push(newStoryProgress.length - 1);
+        }
+        
         return {
           ...prev,
           storyProgress: newStoryProgress,
-          currentPlayerIndex: response.nextPlayerIndex
+          currentPlayerIndex: response.nextPlayerIndex,
+          chapters: updatedChapters,
+          currentChapterIndex: nextChapterIndex,
+          roundsInCurrentChapter: nextRoundsInChapter
         };
       });
       

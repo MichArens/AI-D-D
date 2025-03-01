@@ -1,5 +1,5 @@
 from fastapi import HTTPException, BackgroundTasks
-from models import GameState, ActionRequest, CharacterIconRequest
+from models import GameState, ActionRequest, CharacterIconRequest, Chapter
 from ai_services import generate_text, generate_image, generate_music
 import random
 
@@ -37,25 +37,44 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     
     party_description = ", ".join(character_descriptions)
     
-    # Generate initial story
-    prompt = f"""
-    You are the Dungeon Master for a new D&D adventure. Create an engaging opening scene for a party consisting of:
-    {party_description}
+    # Generate chapter title
+    chapter_prompt = f"""
+    You are the Dungeon Master for a new D&D adventure. Create an engaging chapter title for the beginning of an adventure
+    with a party consisting of: {party_description}
     
-    Provide a vivid description of the initial setting and situation in 3-4 paragraphs, making sure to include their genders.
-    Then, generate exactly 3 possible actions that the first player ({game_state.characters[0].name}) could take.
-    Format your response as follows:
-    
-    STORY:
-    [Your engaging opening scene here]
-    
-    ACTIONS:
-    1. [First action choice]
-    2. [Second action choice]
-    3. [Third action choice]
+    The title should be short (5-7 words) and evocative. Format your response with just the title, no additional text.
     """
     
     try:
+        chapter_title = await generate_text(chapter_prompt, model)
+        chapter_title = chapter_title.strip().strip('"').strip("'")
+        
+        # Create first chapter
+        first_chapter = Chapter(
+            id=0,
+            title=chapter_title,
+            segments=[]
+        )
+        
+        # Generate initial story
+        prompt = f"""
+        You are the Dungeon Master for a new D&D adventure. Create an engaging opening scene for a party consisting of:
+        {party_description}
+        
+        This is Chapter 1: "{chapter_title}" of the adventure.
+        Provide a vivid description of the initial setting and situation in 3-4 paragraphs, making sure to include their genders.
+        Then, generate exactly 3 possible actions that the first player ({game_state.characters[0].name}) could take.
+        Format your response as follows:
+        
+        STORY:
+        [Your engaging opening scene here]
+        
+        ACTIONS:
+        1. [First action choice]
+        2. [Second action choice]
+        3. [Third action choice]
+        """
+        
         response_text = await generate_text(prompt, model)
         
         # Parse the response to extract story and actions
@@ -94,21 +113,25 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
         music_url = None
         if game_state.settings.enableMusic:
             background_tasks.add_task(generate_music, story_part[:100])
-            # We don't wait for music to be ready - it will be fetched on subsequent requests
         
         # Update the story progress
         initial_story = {
             "text": story_part,
             "image": image_base64,
             "player": None,
-            "action": None
+            "action": None,
+            "chapterId": 0
         }
         
-        # Return the full response
+        # Update first chapter with segment index
+        first_chapter.segments.append(0)
+        
+        # Return the full response including the first chapter
         return {
             "storyUpdate": initial_story,
             "choices": actions,
-            "musicUrl": music_url
+            "musicUrl": music_url,
+            "chapter": first_chapter
         }
     
     except Exception as e:
@@ -143,85 +166,214 @@ async def take_action(request: ActionRequest):
     next_player_idx = (current_player_idx + 1) % len(game_state.characters)
     next_player = game_state.characters[next_player_idx]
     
+    # Increment the rounds in current chapter counter - make sure this is used correctly
+    rounds_in_chapter = game_state.roundsInCurrentChapter + 1
+    current_chapter_idx = game_state.currentChapterIndex
+    current_chapter = game_state.chapters[current_chapter_idx] if game_state.chapters and len(game_state.chapters) > current_chapter_idx else None
+    
+    # Fixed: Ensure chapter ends precisely after 3 rounds
+    end_chapter = rounds_in_chapter >= 3
+    
     # Create prompt for generating the next story segment
-    # Include full story history for context
-    story_history = ""
-    for i, segment in enumerate(game_state.storyProgress):
-        story_history += f"Scene {i+1}: {segment.get('text', '')}\n"
-        if segment.get('player') and segment.get('action'):
-            story_history += f"Then {segment['player']} chose to: {segment['action']}\n"
+    # Include story history from this chapter only
+    chapter_story = ""
+    if current_chapter and current_chapter.segments:
+        for seg_idx in current_chapter.segments:
+            if seg_idx < len(game_state.storyProgress):
+                segment = game_state.storyProgress[seg_idx]
+                chapter_story += f"{segment.get('text', '')}\n"
+                if segment.get('player') and segment.get('action'):
+                    chapter_story += f"Then {segment['player']} chose to: {segment['action']}\n"
     
-    prompt = f"""
-    You are the Dungeon Master for an ongoing D&D adventure. Continue the story based on the player's choice.
-    
-    Story so far:
-    {story_history}
-    
-    Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
-    
-    Continue the story with what happens next according to the current player chose, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}, {next_player.gender}).
-    
-    Format your response as follows:
-    
-    STORY:
-    [Your engaging continuation here, 2-3 paragraphs]
-    
-    ACTIONS:
-    1. [First action choice]
-    2. [Second action choice]
-    3. [Third action choice]
-    """
+    # Create prompt based on whether the chapter is ending
+    if end_chapter:
+        prompt = f"""
+        You are the Dungeon Master for an ongoing D&D adventure. The current chapter is ending.
+        
+        Story this chapter:
+        {chapter_story}
+        
+        Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+        
+        Write a satisfying conclusion to this chapter that resolves the immediate situation, based on {current_player.name}'s action.
+        Then create a title for the next chapter that hints at a new development or location.
+        
+        Format your response as follows:
+        
+        STORY:
+        [Your engaging chapter conclusion here, 2-3 paragraphs]
+        
+        NEXT CHAPTER:
+        [New chapter title - short and evocative]
+        """
+    else:
+        prompt = f"""
+        You are the Dungeon Master for an ongoing D&D adventure. Continue the story based on the player's choice.
+        
+        Story so far this chapter:
+        {chapter_story}
+        
+        Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+        
+        Continue the story with what happens next according to the current player's choice, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}, {next_player.gender}).
+        
+        Format your response as follows:
+        
+        STORY:
+        [Your engaging continuation here, 2-3 paragraphs]
+        
+        ACTIONS:
+        1. [First action choice]
+        2. [Second action choice]
+        3. [Third action choice]
+        """
     
     try:
         response_text = await generate_text(prompt, model)
         
-        # Parse the response to extract story and actions
-        story_part = ""
-        actions = []
-        
-        if "STORY:" in response_text and "ACTIONS:" in response_text:
-            story_part = response_text.split("STORY:")[1].split("ACTIONS:")[0].strip()
-            actions_text = response_text.split("ACTIONS:")[1].strip()
+        if end_chapter:
+            # Parse the response to extract story conclusion and next chapter title
+            story_part = ""
+            next_chapter_title = "The Next Chapter"
             
-            # Extract numbered actions
-            action_lines = actions_text.split("\n")
+            if "STORY:" in response_text and "NEXT CHAPTER:" in response_text:
+                story_part = response_text.split("STORY:")[1].split("NEXT CHAPTER:")[0].strip()
+                next_chapter_title = response_text.split("NEXT CHAPTER:")[1].strip()
+                next_chapter_title = next_chapter_title.strip().strip('"').strip("'")
+            else:
+                # Fallback parsing
+                parts = response_text.split("\n\n")
+                story_part = parts[0] if parts else response_text
+                if len(parts) > 1:
+                    next_chapter_title = parts[-1].strip().strip('"').strip("'")[:30]
+            
+            # Generate chapter summary
+            summary_prompt = f"""
+            Create a concise summary (1-2 sentences) of the following chapter in a D&D adventure:
+            
+            {chapter_story}
+            {story_part}
+            
+            Just provide the summary text without any additional formatting or text.
+            """
+            
+            chapter_summary = await generate_text(summary_prompt, model)
+            chapter_summary = chapter_summary.strip().strip('"').strip("'")
+            
+            # Generate a chapter image if enabled
+            chapter_image = None
+            if game_state.settings.enableImages:
+                image_prompt = f"Fantasy illustration of: {chapter_summary}"
+                chapter_image = await generate_image(image_prompt)
+            
+            # Update current chapter with summary and image
+            if current_chapter:
+                current_chapter.summary = chapter_summary
+                current_chapter.image = chapter_image
+            
+            # Create next chapter
+            next_chapter = Chapter(
+                id=current_chapter_idx + 1 if current_chapter else 0,
+                title=next_chapter_title,
+                segments=[]
+            )
+            
+            # Generate initial actions for next chapter
+            next_chapter_prompt = f"""
+            You are the Dungeon Master for a D&D adventure. The party has just started a new chapter titled "{next_chapter_title}".
+            
+            Provide exactly 3 possible actions that {next_player.name} (a {next_player.race} {next_player.characterClass}) could take in this new situation.
+            
+            Format your response as:
+            
+            1. [First action choice]
+            2. [Second action choice]
+            3. [Third action choice]
+            """
+            
+            actions_response = await generate_text(next_chapter_prompt, model)
+            actions = []
+            action_lines = actions_response.split("\n")
             for line in action_lines:
                 line = line.strip()
                 if line and any(line.startswith(f"{i}.") for i in range(1, 10)):
                     action_text = line[2:].strip()
                     actions.append({"id": len(actions), "text": action_text})
-        
-        # If parsing failed, use a fallback approach
-        if not story_part or len(actions) != 3:
-            # Simple fallback parsing
-            parts = response_text.split("\n\n")
-            story_part = parts[0] if parts else response_text
-            actions = [
-                {"id": 0, "text": "Investigate further"},
-                {"id": 1, "text": "Talk to someone nearby"},
-                {"id": 2, "text": "Take a different approach"}
-            ]
+            
+            # Fallback if parsing failed
+            if len(actions) < 3:
+                actions = [
+                    {"id": 0, "text": "Explore the new area"},
+                    {"id": 1, "text": "Seek out new allies or information"},
+                    {"id": 2, "text": "Prepare for potential challenges ahead"}
+                ]
+                
+        else:
+            # Parse standard response (mid-chapter)
+            story_part = ""
+            actions = []
+            
+            if "STORY:" in response_text and "ACTIONS:" in response_text:
+                story_part = response_text.split("STORY:")[1].split("ACTIONS:")[0].strip()
+                actions_text = response_text.split("ACTIONS:")[1].strip()
+                
+                # Extract numbered actions
+                action_lines = actions_text.split("\n")
+                for line in action_lines:
+                    line = line.strip()
+                    if line and any(line.startswith(f"{i}.") for i in range(1, 10)):
+                        action_text = line[2:].strip()
+                        actions.append({"id": len(actions), "text": action_text})
+            
+            # Fallback parsing
+            if not story_part or len(actions) != 3:
+                parts = response_text.split("\n\n")
+                story_part = parts[0] if parts else response_text
+                actions = [
+                    {"id": 0, "text": "Investigate further"},
+                    {"id": 1, "text": "Talk to someone nearby"},
+                    {"id": 2, "text": "Take a different approach"}
+                ]
         
         # Generate image for the story if enabled
         image_base64 = None
         if game_state.settings.enableImages:
-            image_base64 = await generate_image(story_part[:200])  # Use first part of story as prompt
+            image_base64 = await generate_image(story_part[:200])
         
-        # Update the story progress with the player's choice and the next segment
+        # Create the story update
+        next_chapter_id = current_chapter_idx + 1 if end_chapter else current_chapter_idx
         story_update = {
             "text": story_part,
             "image": image_base64,
             "player": current_player.name,
             "action": chosen_action,
+            "chapterId": next_chapter_id if end_chapter else current_chapter_idx,  # Fix: use next chapter ID for new segments
             "choices": actions
         }
         
-        # Return the full response
-        return {
-            "storyUpdate": story_update,
-            "choices": actions,
-            "nextPlayerIndex": next_player_idx
-        }
+        # Return different response structures based on whether chapter ended
+        if end_chapter:
+            return {
+                "storyUpdate": story_update,
+                "choices": actions,
+                "nextPlayerIndex": next_player_idx,
+                "chapterEnded": True,
+                "chapterSummary": chapter_summary,
+                "chapterImage": chapter_image,
+                "nextChapter": {
+                    "id": next_chapter_id,
+                    "title": next_chapter_title
+                },
+                "roundsInChapter": 0  # Reset for new chapter
+            }
+        else:
+            return {
+                "storyUpdate": story_update,
+                "choices": actions,
+                "nextPlayerIndex": next_player_idx,
+                "chapterEnded": False,
+                "roundsInChapter": rounds_in_chapter
+            }
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process action: {str(e)}")
