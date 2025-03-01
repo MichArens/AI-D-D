@@ -9,9 +9,9 @@ const GameScreen = ({ gameState, setGameState, handleActionChoice, loading, erro
   
   return (
     <div className="game-screen">
-      {/* Main chapter header at top of screen */}
+      {/* Sticky chapter header at top of screen */}
       {currentChapter && (
-        <div className="main-chapter-header">
+        <div className="sticky-chapter-header">
           <h2>Chapter {gameState.currentChapterIndex + 1}: {currentChapter.title}</h2>
         </div>
       )}
@@ -93,24 +93,14 @@ const GameScreen = ({ gameState, setGameState, handleActionChoice, loading, erro
               )}
             </div>
           ))}
-          {/* End of story segments mapping */}
         </div>
         
         <div className="action-panel">
-          {/* Current chapter info */}
+          {/* Current chapter info - removed rounds counter */}
           {currentChapter && (
             <div className="current-chapter-info">
               <h3>Chapter {gameState.currentChapterIndex + 1}</h3>
               <h4>{currentChapter.title}</h4>
-              <div className="chapter-progress">
-                <span className="progress-text">Round {gameState.roundsInCurrentChapter + 1}/3</span>
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ width: `${(gameState.roundsInCurrentChapter / 3) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
             </div>
           )}
           

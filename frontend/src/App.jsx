@@ -248,7 +248,7 @@ function App() {
   };
   
   return (
-    <div className="dnd-app">
+    <div className={`dnd-app ${screen === 'game' ? 'dnd-app-fullscreen' : ''}`}>
       {screen === 'setup' && <SetupScreen 
         gameState={gameState} 
         setGameState={setGameState} 
