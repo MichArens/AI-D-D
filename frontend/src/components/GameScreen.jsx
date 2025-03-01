@@ -16,39 +16,54 @@ const GameScreen = ({
   toggleTTS, 
   storyRef 
 }) => {
-  // Current chapter title for the header
-  const currentChapter = gameState.chapters && gameState.chapters[gameState.currentChapterIndex];
-  const viewingChapter = gameState.chapters && gameState.chapters[viewingChapterIndex];
+  // Safe access to current chapter
+  const currentChapter = gameState.chapters && gameState.chapters.length > gameState.currentChapterIndex ? 
+    gameState.chapters[gameState.currentChapterIndex] : null;
+  
+  // Safe access to viewing chapter
+  const viewingChapter = gameState.chapters && gameState.chapters.length > viewingChapterIndex ? 
+    gameState.chapters[viewingChapterIndex] : null;
   
   // Flag to check if viewing a past chapter
   const isViewingPastChapter = viewingChapterIndex < gameState.currentChapterIndex;
   
+  // Check if chapters are available
+  const hasChapters = gameState.chapters && gameState.chapters.length > 0;
+  
   return (
     <div className="game-screen">
-      {/* Sticky chapter header at top of screen */}
-      {viewingChapter && (
-        <div className="sticky-chapter-header">
-          <h2>
-            Chapter {viewingChapterIndex + 1}: {viewingChapter.title}
-            {isViewingPastChapter && <span className="history-badge">History Mode</span>}
-          </h2>
-        </div>
-      )}
+      {/* Sticky chapter header at top of screen - always show even if null with a fallback */}
+      <div className="sticky-chapter-header">
+        <h2>
+          {viewingChapter ? (
+            <>Chapter {viewingChapterIndex + 1}: {viewingChapter.title || "Adventure"}</>
+          ) : (
+            <>Chapter 1: Adventure Begins</>
+          )}
+          {isViewingPastChapter && <span className="history-badge">History Mode</span>}
+        </h2>
+      </div>
       
       <div className="game-layout">
         <div className="chapters-sidebar">
           <h3>Chapters</h3>
           <div className="chapters-list">
-            {gameState.chapters && gameState.chapters.map((chapter, index) => (
-              <div 
-                key={index} 
-                className={`chapter-item ${index === viewingChapterIndex ? 'active-chapter' : ''}`}
-                onClick={() => handleViewChapter(index)}
-              >
-                {/* Only show chapter title in sidebar */}
-                <h4>Chapter {index + 1}: {chapter.title}</h4>
+            {hasChapters ? (
+              gameState.chapters.map((chapter, index) => (
+                <div 
+                  key={index} 
+                  className={`chapter-item ${index === viewingChapterIndex ? 'active-chapter' : ''}`}
+                  onClick={() => handleViewChapter(index)}
+                >
+                  {/* Only show chapter title in sidebar */}
+                  <h4>Chapter {index + 1}: {chapter.title || "Chapter"}</h4>
+                </div>
+              ))
+            ) : (
+              <div className="chapter-item active-chapter">
+                <h4>Chapter 1: Adventure Begins</h4>
               </div>
-            ))}
+            )}
           </div>
         </div>
 

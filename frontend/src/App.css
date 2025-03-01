@@ -565,6 +565,10 @@ button:disabled {
   text-align: center;
   border-bottom: 3px double var(--primary-red);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .sticky-chapter-header h2 {
@@ -572,7 +576,7 @@ button:disabled {
   color: var(--accent-gold);
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
   margin: 0;
-  padding: 0;
+  padding: 0 15px;
   border-bottom: none;
 }
 
@@ -631,11 +635,14 @@ button:disabled {
   transition: all 0.3s ease;
   padding: 10px;
   border-radius: 5px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px dashed var(--primary-red);
+  background-color: rgba(26, 10, 10, 0.5);
 }
 
 .chapter-item:hover {
-  background-color: rgba(139, 0, 0, 0.2);
-  transform: translateX(3px);
+  background-color: rgba(139, 0, 0, 0.3);
 }
 
 .chapter-item h4 {
@@ -643,8 +650,9 @@ button:disabled {
 }
 
 .active-chapter {
-  background-color: rgba(139, 0, 0, 0.3);
+  background-color: rgba(139, 0, 0, 0.5);
   box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+  border: 1px solid var(--accent-gold);
 }
 
 .history-badge {

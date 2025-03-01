@@ -47,11 +47,19 @@ export const api = {
     
     const data = await response.json();
     
-    // Initialize chapters if missing from response
+    // Initialize chapters if missing from response or missing title
     if (data.chapter) {
-      gameState.chapters = [data.chapter];
-      gameState.currentChapterIndex = 0;
-      gameState.roundsInCurrentChapter = 0;
+      if (!data.chapter.title) {
+        data.chapter.title = "Adventure Begins";
+      }
+    } else {
+      // Create a default chapter if none exists
+      data.chapter = {
+        id: 0,
+        title: "Adventure Begins",
+        summary: "",
+        segments: [0]
+      };
     }
     
     return data;

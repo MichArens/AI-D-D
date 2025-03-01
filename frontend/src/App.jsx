@@ -162,12 +162,22 @@ function App() {
         };
         newStoryProgress.push(initialStory);
         
+        // Initialize chapter if it exists in response
+        const chapters = gameResponse.chapter ? [gameResponse.chapter] : [];
+        
         return {
           ...prev,
           storyProgress: newStoryProgress,
-          musicUrl: gameResponse.musicUrl
+          musicUrl: gameResponse.musicUrl,
+          chapters: chapters,
+          currentChapterIndex: 0,
+          roundsInCurrentChapter: 0,
+          viewingChapterIndex: 0 // Initialize viewing to the first chapter
         };
       });
+      
+      // Initialize viewing chapter index
+      setViewingChapterIndex(0);
       
       setScreen('game');
     } catch (err) {
