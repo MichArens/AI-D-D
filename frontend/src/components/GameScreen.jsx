@@ -108,7 +108,7 @@ const GameScreen = ({
               </div>
               {gameState.storyProgress[0].image && (
                 <div className="story-image centered-image">
-                  <img src={`data:image/png;base64,${gameState.storyProgress[0].image}`} alt="Chapter Summary" />
+                  <img src={`data:image/png;base64,${gameState.storyProgress[0].image}`} alt="Chapter Summary" key={`img-summary-${viewingChapterIndex}-${Date.now()}`} />
                 </div>
               )}
             </div>
@@ -116,57 +116,63 @@ const GameScreen = ({
           
           {/* Show regular story progression when not in summary mode */}
           {(!isViewingPastChapter || !gameState.storyProgress[0]?.isChapterSummary) && 
-           gameState.storyProgress.map((segment, index) => (
-            <div 
-              key={index} 
-              className={`story-segment ${segment.chapterId !== undefined && 
-                segment.chapterId !== (gameState.storyProgress[index-1]?.chapterId || -1) ? 
-                'new-chapter' : ''}`}
-            >
-              <div className="story-text">
-                {/* Player action info */}
-                {segment.player && segment.action && (
-                  <div className="player-action">
-                    <div className="player-icon">
-                      {gameState.characters.find(c => c.name === segment.player)?.icon ? (
-                        <img 
-                          src={`data:image/png;base64,${gameState.characters.find(c => c.name === segment.player)?.icon}`} 
-                          alt={segment.player} 
-                        />
-                      ) : (
-                        <div className="icon-placeholder">{segment.player[0]}</div>
-                      )}
-                    </div>
-                    <p><strong>{segment.player}</strong> chose to {segment.action}</p>
-                  </div>
-                )}
-                
-                <HighlightedText 
-                    text={segment.text} 
-                    activeTTS={activeTTS} 
-                    isPlaying={activeTTS === index} 
-                />
-                
-                {/* TTS Button with speaker icons */}
-                {gameState.settings.enableTTS && segment.text && (
-                  <button 
-                    className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
-                    onClick={() => toggleTTS(index)}
-                    title={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                    aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                    disabled={loading}
-                  >
-                    {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
-                  </button>
-                )}
-              </div>
-              {segment.image && (
-                <div className="story-image">
-                  <img src={`data:image/png;base64,${segment.image}`} alt="Scene" />
-                </div>
-              )}
-            </div>
-          ))}
+           gameState.storyProgress.map((segment, index) => {
+             // Generate a truly unique key for each segment
+             const segmentKey = segment._id || 
+               `${segment.chapterId || 0}-${index}-${segment.timestamp || Date.now()}-${Math.random()}`;
+             
+             return (
+               <div key={segmentKey} className="story-segment">
+                 <div className="story-text">
+                   {/* Player action info */}
+                   {segment.player && segment.action && (
+                     <div className="player-action">
+                       <div className="player-icon">
+                         {gameState.characters.find(c => c.name === segment.player)?.icon ? (
+                           <img 
+                             src={`data:image/png;base64,${gameState.characters.find(c => c.name === segment.player)?.icon}`} 
+                             alt={segment.player} 
+                           />
+                         ) : (
+                           <div className="icon-placeholder">{segment.player[0]}</div>
+                         )}
+                       </div>
+                       <p><strong>{segment.player}</strong> chose to {segment.action}</p>
+                     </div>
+                   )}
+                   
+                   <HighlightedText 
+                       text={segment.text} 
+                       activeTTS={activeTTS} 
+                       isPlaying={activeTTS === index} 
+                   />
+                   
+                   {/* TTS Button with speaker icons */}
+                   {gameState.settings.enableTTS && segment.text && (
+                     <button 
+                       className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
+                       onClick={() => toggleTTS(index)}
+                       title={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                       aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                       disabled={loading}
+                     >
+                       {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                     </button>
+                   )}
+                 </div>
+                 {segment.image && (
+                   <div className="story-image">
+                     <img 
+                       src={`data:image/png;base64,${segment.image}`} 
+                       alt="Scene" 
+                       // Guaranteed unique key for image
+                       key={`img-${segmentKey}-${Date.now()}`}
+                     />
+                   </div>
+                 )}
+               </div>
+             );
+           })}
         </div>
         
         <div className="action-panel">

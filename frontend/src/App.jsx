@@ -5,6 +5,7 @@ import CharacterScreen from './components/CharacterScreen';
 import GameScreen from './components/GameScreen';
 import { api } from './services/api';
 import { toggleTTS } from './utils/tts';
+import { prepareChapterContent, addSegmentToChapter, deepCloneWithNewRefs } from './utils/chapter-manager';
 
 // App Component
 function App() {
@@ -188,7 +189,7 @@ function App() {
     }
   };
   
-  // Handle player action choice
+  // Handle player action choice - completely rewritten
   const handleActionChoice = async (choiceId) => {
     if (loading) return;
     
@@ -200,21 +201,23 @@ function App() {
       const response = await api.takeAction(gameState, choiceId);
       
       setGameState(prev => {
-        // Add new story segment to progress
-        const newStoryProgress = [...prev.storyProgress];
-        const newStory = { 
+        // Create a new story segment with unique ID
+        const newStory = {
           ...response.storyUpdate,
-          choices: response.choices
+          choices: response.choices,
+          _id: `segment-${Date.now()}-${Math.random()}`,
+          timestamp: Date.now(),
+          player: prev.characters[prev.currentPlayerIndex]?.name,
+          action: prev.storyProgress[prev.storyProgress.length - 1]?.choices?.find(c => c.id === choiceId)?.text
         };
-        newStoryProgress.push(newStory);
+        
+        let updatedChapters = deepCloneWithNewRefs(prev.chapters || []);
+        let nextChapterIndex = prev.currentChapterIndex;
+        let storyToShow = [];
         
         // Handle chapter transitions
-        let updatedChapters = [...prev.chapters];
-        let nextChapterIndex = prev.currentChapterIndex;
-        let nextRoundsInChapter = response.roundsInChapter || 0;
-        
-        if (response.chapterEnded) {
-          // Update current chapter with summary and image
+        if (response.chapterEnded && response.nextChapter) {
+          // Complete the current chapter
           if (updatedChapters[prev.currentChapterIndex]) {
             updatedChapters[prev.currentChapterIndex] = {
               ...updatedChapters[prev.currentChapterIndex],
@@ -223,44 +226,40 @@ function App() {
             };
           }
           
-          // Add new chapter
-          if (response.nextChapter) {
-            const newChapter = {
-              id: response.nextChapter.id,
-              title: response.nextChapter.title,
-              summary: "",
-              segments: [newStoryProgress.length - 1]  // Start with the new segment
-            };
-            updatedChapters.push(newChapter);
-            nextChapterIndex = response.nextChapter.id;
-            
-            // Reset story progression to only show new chapter
-            const resetStoryProgress = [newStoryProgress[newStoryProgress.length - 1]];
-            
-            setViewingChapterIndex(nextChapterIndex); // Update viewing chapter
-            
-            return {
-              ...prev,
-              storyProgress: resetStoryProgress, // Reset to only show current chapter
-              currentPlayerIndex: response.nextPlayerIndex,
-              chapters: updatedChapters,
-              currentChapterIndex: nextChapterIndex,
-              roundsInCurrentChapter: nextRoundsInChapter,
-              allSegments: newStoryProgress // Store all segments for history
-            };
-          }
-        } else if (prev.chapters[prev.currentChapterIndex]) {
-          // Add new segment to current chapter
-          updatedChapters[prev.currentChapterIndex].segments.push(newStoryProgress.length - 1);
+          // Create new chapter
+          const newChapter = {
+            id: updatedChapters.length,
+            title: response.nextChapter.title,
+            summary: "",
+            segments: [0],  // Start with index 0 in this chapter
+            storedSegments: { 0: newStory }  // Store segment directly in chapter
+          };
+          
+          updatedChapters.push(newChapter);
+          nextChapterIndex = updatedChapters.length - 1;
+          
+          // Show only the first segment of new chapter
+          storyToShow = [deepCloneWithNewRefs(newStory)];
+          
+          // Update viewing chapter to new chapter
+          setViewingChapterIndex(nextChapterIndex);
+          
+        } else {
+          // Add segment to current chapter
+          const result = addSegmentToChapter(updatedChapters, newStory, prev.currentChapterIndex);
+          updatedChapters = result.chapters;
+          
+          // Add new segment to current display
+          storyToShow = [...prev.storyProgress, deepCloneWithNewRefs(newStory)];
         }
         
         return {
           ...prev,
-          storyProgress: newStoryProgress,
+          storyProgress: storyToShow,
           currentPlayerIndex: response.nextPlayerIndex,
           chapters: updatedChapters,
           currentChapterIndex: nextChapterIndex,
-          roundsInCurrentChapter: nextRoundsInChapter
+          roundsInCurrentChapter: response.chapterEnded ? 0 : (response.roundsInChapter || 0)
         };
       });
       
@@ -273,7 +272,7 @@ function App() {
     }
   };
   
-  // Function to switch to a specific chapter view - add loading check
+  // Function to switch to a specific chapter view - completely rewritten
   const handleViewChapter = (chapterIndex) => {
     // Don't allow chapter changes while loading
     if (loading) return;
@@ -281,40 +280,39 @@ function App() {
     setViewingChapterIndex(chapterIndex);
     
     setGameState(prev => {
-      // We're viewing a past chapter
-      if (chapterIndex < prev.currentChapterIndex) {
-        const chapter = prev.chapters[chapterIndex];
-        
-        // Create a single "summary" story segment for the viewed chapter
-        const summarySegment = {
-          text: chapter.summary || "No summary available for this chapter.",
-          image: chapter.image,
-          chapterId: chapterIndex,
-          isChapterSummary: true // Flag to indicate this is a summary view
-        };
-        
-        return {
-          ...prev,
-          storyProgress: [summarySegment]
-        };
-      } 
-      // We're viewing the current chapter
-      else if (chapterIndex === prev.currentChapterIndex) {
-        // If allSegments exists, we can use segment indexes to reconstruct current chapter
-        if (prev.allSegments) {
-          const currentChapter = prev.chapters[chapterIndex];
-          const currentSegments = currentChapter.segments || [];
-          
-          const filteredStory = currentSegments.map(idx => prev.allSegments[idx]);
-          
-          return {
-            ...prev,
-            storyProgress: filteredStory
-          };
-        }
+      if (!prev.chapters || chapterIndex < 0 || chapterIndex >= prev.chapters.length) {
+        return prev;
       }
       
-      return prev;
+      const targetChapter = prev.chapters[chapterIndex];
+      
+      // Completely rebuild the story progress for viewing this chapter
+      let newStoryProgress;
+      
+      if (chapterIndex < prev.currentChapterIndex) {
+        // Past chapter - show summary
+        newStoryProgress = [{
+          text: targetChapter.summary || "No summary available for this chapter.",
+          image: targetChapter.image,
+          chapterId: chapterIndex,
+          isChapterSummary: true,
+          _id: `summary-${chapterIndex}-${Date.now()}`
+        }];
+      } else {
+        // Current chapter - rebuild from stored segments
+        newStoryProgress = (targetChapter.segments || []).map(segIdx => {
+          if (targetChapter.storedSegments && targetChapter.storedSegments[segIdx]) {
+            return deepCloneWithNewRefs(targetChapter.storedSegments[segIdx]);
+          }
+          return null;
+        }).filter(Boolean);
+      }
+      
+      return {
+        ...prev,
+        // Replace storyProgress with completely fresh objects
+        storyProgress: newStoryProgress
+      };
     });
   };
   
