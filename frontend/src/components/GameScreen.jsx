@@ -216,15 +216,14 @@ const GameScreen = ({
                 {/* Display "Start New Chapter" button if chapter is ready to end */}
                 {gameState.readyForNewChapter && nextChapter ? (
                   <div className="new-chapter-container">
-                    <h3>Chapter Complete!</h3>
-                    <p>The story continues in the next chapter...</p>
+                    <h3>Chapter Complete</h3>
+                    <p>The heroes' adventure continues in a new chapter...</p>
                     <button 
                       className="new-chapter-button"
                       onClick={handleStartNewChapter}
                       disabled={loading}
                     >
-                      {/* Use nextChapter.title directly instead of "Chapter" */}
-                      Start Chapter {gameState.chapters.length + 1}: {nextChapter.title}
+                      <i className="fa fa-book-open"></i> Begin: {nextChapter.title}
                     </button>
                   </div>
                 ) : (

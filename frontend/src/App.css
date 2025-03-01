@@ -790,43 +790,60 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
-  background-color: rgba(139, 0, 0, 0.2);
+  padding: 25px;
+  background-color: rgba(26, 10, 10, 0.8);
   border: 2px solid var(--accent-gold);
   border-radius: 8px;
   text-align: center;
-  margin-top: 15px;
+  margin-top: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .new-chapter-container h3 {
-  margin-bottom: 10px;
-  font-size: 1.4rem;
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  color: var(--accent-gold);
+  font-family: var(--title-font);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .new-chapter-container p {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   font-style: italic;
-  color: var(--accent-gold);
+  color: var(--off-white);
+  font-size: 1.1rem;
 }
 
+/* Make the new-chapter-button extend main-button styling */
 .new-chapter-button {
+  /* Inherit main button styles */
   background-color: var(--primary-red);
   color: var(--off-white);
-  font-family: var(--body-font);
+  font-family: var(--title-font);
   font-weight: bold;
-  font-size: 1.1rem;
-  padding: 15px 25px;
+  font-size: 1.2rem;
+  padding: 12px 24px;
   border: 2px solid var(--accent-gold);
   border-radius: 8px;
   transition: all 0.3s ease;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  
+  /* Additional button styling to make it special but consistent */
   width: 100%;
   margin-top: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .new-chapter-button:hover:not(:disabled) {
   background-color: var(--secondary-red);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+.new-chapter-button:active:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 .new-chapter-button:disabled {
