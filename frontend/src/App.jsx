@@ -30,6 +30,7 @@ function App() {
   const [currentAction, setCurrentAction] = useState(null);
   const [activeTTS, setActiveTTS] = useState(null); // Track which story segment is being spoken
   const storyRef = useRef(null);
+  const [viewingChapterIndex, setViewingChapterIndex] = useState(0);
   
   // Load available models on startup
   useEffect(() => {
@@ -222,6 +223,21 @@ function App() {
             };
             updatedChapters.push(newChapter);
             nextChapterIndex = response.nextChapter.id;
+            
+            // Reset story progression to only show new chapter
+            const resetStoryProgress = [newStoryProgress[newStoryProgress.length - 1]];
+            
+            setViewingChapterIndex(nextChapterIndex); // Update viewing chapter
+            
+            return {
+              ...prev,
+              storyProgress: resetStoryProgress, // Reset to only show current chapter
+              currentPlayerIndex: response.nextPlayerIndex,
+              chapters: updatedChapters,
+              currentChapterIndex: nextChapterIndex,
+              roundsInCurrentChapter: nextRoundsInChapter,
+              allSegments: newStoryProgress // Store all segments for history
+            };
           }
         } else if (prev.chapters[prev.currentChapterIndex]) {
           // Add new segment to current chapter
@@ -245,6 +261,48 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Function to switch to a specific chapter view
+  const handleViewChapter = (chapterIndex) => {
+    setViewingChapterIndex(chapterIndex);
+    
+    setGameState(prev => {
+      // We're viewing a past chapter
+      if (chapterIndex < prev.currentChapterIndex) {
+        const chapter = prev.chapters[chapterIndex];
+        
+        // Create a single "summary" story segment for the viewed chapter
+        const summarySegment = {
+          text: chapter.summary || "No summary available for this chapter.",
+          image: chapter.image,
+          chapterId: chapterIndex,
+          isChapterSummary: true // Flag to indicate this is a summary view
+        };
+        
+        return {
+          ...prev,
+          storyProgress: [summarySegment]
+        };
+      } 
+      // We're viewing the current chapter
+      else if (chapterIndex === prev.currentChapterIndex) {
+        // If allSegments exists, we can use segment indexes to reconstruct current chapter
+        if (prev.allSegments) {
+          const currentChapter = prev.chapters[chapterIndex];
+          const currentSegments = currentChapter.segments || [];
+          
+          const filteredStory = currentSegments.map(idx => prev.allSegments[idx]);
+          
+          return {
+            ...prev,
+            storyProgress: filteredStory
+          };
+        }
+      }
+      
+      return prev;
+    });
   };
   
   return (
@@ -273,6 +331,8 @@ function App() {
         gameState={gameState} 
         setGameState={setGameState} 
         handleActionChoice={handleActionChoice} 
+        handleViewChapter={handleViewChapter}
+        viewingChapterIndex={viewingChapterIndex}
         loading={loading} 
         error={error} 
         currentAction={currentAction} 
