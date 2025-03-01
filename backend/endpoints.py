@@ -2,18 +2,53 @@ from fastapi import HTTPException, BackgroundTasks
 from models import GameState, ActionRequest, CharacterIconRequest, Chapter
 from ai_services import generate_text, generate_image, generate_music
 import random
+from pydantic import BaseModel
+from typing import Dict, Any
+import logging
+import traceback
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Fix the character options endpoint with better error handling
 async def generate_character_options():
     """Generate available races and classes for this game session"""
-    from models import Race, CharacterClass
-    # Randomly select a subset of races and classes to be available this game
-    available_races = random.sample(list(Race), min(5, len(Race)))
-    available_classes = random.sample(list(CharacterClass), min(5, len(CharacterClass)))
-    
-    return {
-        "races": [race.value for race in available_races],
-        "classes": [cls.value for cls in available_classes]
-    }
+    try:
+        logger.info("Generating character options")
+        from models import Race, CharacterClass
+        
+        # Ensure we have Race and CharacterClass defined
+        if not list(Race) or not list(CharacterClass):
+            logger.error("Race or CharacterClass enums are empty")
+            # Provide defaults if enums are empty
+            default_races = ["Human", "Elf", "Dwarf", "Orc", "Halfling"]
+            default_classes = ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+            return {
+                "races": default_races,
+                "classes": default_classes
+            }
+            
+        # Randomly select a subset of races and classes to be available this game
+        available_races = random.sample(list(Race), min(5, len(Race)))
+        available_classes = random.sample(list(CharacterClass), min(5, len(CharacterClass)))
+        
+        result = {
+            "races": [race.value for race in available_races],
+            "classes": [cls.value for cls in available_classes]
+        }
+        
+        logger.info(f"Generated options: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error generating character options: {e}")
+        logger.error(traceback.format_exc())
+        # Return default options instead of failing
+        return {
+            "races": ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+            "classes": ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+        }
 
 async def generate_character_icon(request: CharacterIconRequest):
     """Generate a character icon based on character details"""
@@ -297,7 +332,6 @@ async def take_action(request: ActionRequest):
             # Generate initial actions for next chapter
             next_chapter_prompt = f"""
             You are the Dungeon Master for a D&D adventure. The party has just started a new chapter titled "{next_chapter_title}".
-            
             Provide exactly 3 possible actions that {next_player.name} (a {next_player.race} {next_player.characterClass}) could take in this new situation.
             
             Format your response as:
@@ -363,8 +397,7 @@ async def take_action(request: ActionRequest):
             "image": image_base64,
             "player": current_player.name,
             "action": chosen_action,
-            "chapterId": next_chapter_id if end_chapter else current_chapter_idx,  # Fix: use next chapter ID for new segments
-            "choices": actions
+            "chapterId": next_chapter_id
         }
         
         # Return different response structures based on whether chapter ended
@@ -376,6 +409,7 @@ async def take_action(request: ActionRequest):
                 "chapterEnded": True,
                 "chapterSummary": chapter_summary,
                 "chapterImage": chapter_image,
+                "nextChapterTitle": next_chapter_title, # Explicitly include title
                 "nextChapter": {
                     "id": next_chapter_id,
                     "title": next_chapter_title
@@ -390,7 +424,7 @@ async def take_action(request: ActionRequest):
                 "chapterEnded": False,
                 "roundsInChapter": rounds_in_chapter
             }
-    
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process action: {str(e)}")
 
@@ -413,3 +447,124 @@ async def get_available_models():
     except Exception as e:
         # Return a default list if Ollama isn't available
         return {"models": ["llama3", "mistral", "wizard-mega"]}
+
+# Update the NewChapterRequest model to be more flexible with input
+from pydantic import BaseModel, Field
+from typing import Dict, Any, Optional
+
+# New request model for starting a new chapter
+class NewChapterRequest(BaseModel):
+    gameState: Dict[str, Any]
+    nextChapterTitle: str
+    
+    class Config:
+        # Make the model more permissive with extra fields
+        extra = "ignore"
+        # Allow coercing types when possible
+        arbitrary_types_allowed = True
+
+# Improve the start_new_chapter function
+async def start_new_chapter(request: NewChapterRequest):
+    """Generate the first segment of a new chapter"""
+    try:
+        logger.info(f"Starting new chapter: '{request.nextChapterTitle}'")
+        
+        game_state = request.gameState
+        next_chapter_title = request.nextChapterTitle
+        
+        # Safely get model from game state
+        model = game_state.get('settings', {}).get('aiModel', 'llama3')
+        logger.info(f"Using AI model: {model}")
+        
+        # Get the first player index
+        first_player_idx = game_state.get('currentPlayerIndex', 0)
+        
+        # Safely get character information
+        characters = game_state.get('characters', [])
+        if not characters or first_player_idx >= len(characters):
+            logger.error("Invalid character information in game state")
+            raise HTTPException(status_code=400, detail="Invalid character information")
+            
+        first_player = characters[first_player_idx]
+        
+        # Create character description for prompt
+        character_descriptions = []
+        for char in characters:
+            char_name = char.get('name', 'Unknown')
+            char_race = char.get('race', 'Unknown')
+            char_class = char.get('characterClass', 'Unknown')
+            char_gender = char.get('gender', 'Unknown')
+            character_descriptions.append(f"{char_name} the {char_race} {char_class}, {char_gender}")
+        
+        party_description = ", ".join(character_descriptions)
+        
+        # Create prompt for new chapter start
+        prompt = f"""
+        You are the Dungeon Master for an ongoing D&D adventure. The party is beginning a new chapter titled:
+        "{next_chapter_title}"
+        
+        The party consists of: {party_description}
+        
+        Create an engaging opening scene for this new chapter in 3-4 paragraphs.
+        Then, provide exactly 3 possible actions that {first_player.get('name', 'the player')} could take.
+        
+        Format your response as follows:
+        
+        STORY:
+        [Your engaging opening scene here]
+        
+        ACTIONS:
+        1. [First action choice]
+        2. [Second action choice]
+        3. [Third action choice]
+        """
+        
+        # Generate response
+        response_text = await generate_text(prompt, model)
+        
+        # Rest of your parsing logic...
+        story_part = ""
+        actions = []
+        
+        if "STORY:" in response_text and "ACTIONS:" in response_text:
+            story_part = response_text.split("STORY:")[1].split("ACTIONS:")[0].strip()
+            actions_text = response_text.split("ACTIONS:")[1].strip()
+            
+            # Extract numbered actions
+            action_lines = actions_text.split("\n")
+            for line in action_lines:
+                line = line.strip()
+                if line and any(line.startswith(f"{i}.") for i in range(1, 10)):
+                    action_text = line[2:].strip()
+                    actions.append({"id": len(actions), "text": action_text})
+        
+        # If parsing failed, use fallback
+        if not story_part or len(actions) != 3:
+            story_part = response_text.split("\n\n")[0] if "\n\n" in response_text else response_text
+            actions = [
+                {"id": 0, "text": "Investigate the area"},
+                {"id": 1, "text": "Talk to someone nearby"},
+                {"id": 2, "text": "Search for something useful"}
+            ]
+        
+        # Generate image if enabled
+        image_base64 = None
+        enable_images = game_state.get('settings', {}).get('enableImages', False)
+        if enable_images:
+            image_prompt = f"Fantasy scene: {story_part[:200]}"
+            image_base64 = await generate_image(image_prompt)
+        
+        logger.info("Successfully generated new chapter opening")
+        return {
+            "storyUpdate": {
+                "text": story_part,
+                "image": image_base64,
+                "choices": actions
+            },
+            "choices": actions
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in start_new_chapter: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to start new chapter: {str(e)}")

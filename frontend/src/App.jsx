@@ -5,7 +5,18 @@ import CharacterScreen from './components/CharacterScreen';
 import GameScreen from './components/GameScreen';
 import { api } from './services/api';
 import { toggleTTS } from './utils/tts';
-import { prepareChapterContent, addSegmentToChapter, deepCloneWithNewRefs } from './utils/chapter-manager';
+// Conditionally import chapter manager to avoid errors if file doesn't exist
+const chapterManager = (() => {
+  try {
+    return require('./utils/chapter-manager');
+  } catch (e) {
+    console.warn("Chapter manager not found, using fallbacks");
+    return {
+      deepCloneWithNewRefs: obj => JSON.parse(JSON.stringify(obj)),
+      addSegmentToChapter: (chapters, segment, idx) => ({ chapters, allSegments: [] })
+    };
+  }
+})();
 
 // App Component
 function App() {
@@ -32,6 +43,7 @@ function App() {
   const [activeTTS, setActiveTTS] = useState(null); // Track which story segment is being spoken
   const storyRef = useRef(null);
   const [viewingChapterIndex, setViewingChapterIndex] = useState(0);
+  const [nextChapter, setNextChapter] = useState(null);
   
   // Load available models on startup
   useEffect(() => {
@@ -81,20 +93,34 @@ function App() {
     toggleTTS(index, activeTTS, setActiveTTS);
   };
 
-  // Navigate to character creation
+  // Navigate to character creation - improved error handling 
   const handleStartSetup = async () => {
     setLoading(true);
     setError(null);
+    console.log("Starting setup and fetching character options...");
     
     try {
-      const options = await api.getCharacterOptions();
+      let options;
+      try {
+        options = await api.getCharacterOptions();
+        console.log("Received character options:", options);
+      } catch (optionsError) {
+        console.error("Error fetching character options:", optionsError);
+        options = {
+          races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+          classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+        };
+        setError('Using default character options due to API error.');
+      }
+      
       setCharacterOptions(options);
       
       // Initialize character slots based on player count
-      const initialCharacters = Array(gameState.settings.playerCount).fill(null).map((_, idx) => ({
+      const initialCharacters = Array(gameState.settings?.playerCount || 2).fill(null).map((_, idx) => ({
         name: '',
         race: null,
         characterClass: null,
+        gender: null,
         playerIndex: idx,
         icon: null
       }));
@@ -106,8 +132,8 @@ function App() {
       
       setScreen('character');
     } catch (err) {
-      setError('Failed to initialize character creation. Please try again.');
-      console.error(err);
+      console.error('Failed to initialize character creation:', err);
+      setError(`Failed to initialize character creation: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -154,26 +180,36 @@ function App() {
       // Initialize the game with the first story segment
       const gameResponse = await api.startGame(gameState);
       
+      // Make sure we have valid initial data
+      if (!gameResponse || !gameResponse.storyUpdate) {
+        throw new Error("Invalid response from server when starting game");
+      }
+      
       setGameState(prev => {
         // Add initial story to progress
-        const newStoryProgress = [...prev.storyProgress];
         const initialStory = { 
           ...gameResponse.storyUpdate,
-          choices: gameResponse.choices
+          choices: gameResponse.choices || [],
+          _id: `initial-${Date.now()}`
         };
-        newStoryProgress.push(initialStory);
         
         // Initialize chapter if it exists in response
-        const chapters = gameResponse.chapter ? [gameResponse.chapter] : [];
+        const chapters = gameResponse.chapter ? [gameResponse.chapter] : [{
+          id: 0,
+          title: "Adventure Begins",
+          summary: "",
+          segments: [0],
+          storedSegments: {0: initialStory}
+        }];
         
         return {
           ...prev,
-          storyProgress: newStoryProgress,
+          storyProgress: [initialStory],
           musicUrl: gameResponse.musicUrl,
           chapters: chapters,
           currentChapterIndex: 0,
           roundsInCurrentChapter: 0,
-          viewingChapterIndex: 0 // Initialize viewing to the first chapter
+          viewingChapterIndex: 0
         };
       });
       
@@ -182,14 +218,14 @@ function App() {
       
       setScreen('game');
     } catch (err) {
-      setError('Failed to start game. Please try again.');
-      console.error(err);
+      console.error("Start game error:", err);
+      setError('Failed to start game. Please try again. ' + err.message);
     } finally {
       setLoading(false);
     }
   };
   
-  // Handle player action choice - completely rewritten
+  // Handle player action choice - modified to support new chapter flow
   const handleActionChoice = async (choiceId) => {
     if (loading) return;
     
@@ -211,12 +247,12 @@ function App() {
           action: prev.storyProgress[prev.storyProgress.length - 1]?.choices?.find(c => c.id === choiceId)?.text
         };
         
-        let updatedChapters = deepCloneWithNewRefs(prev.chapters || []);
+        let updatedChapters = chapterManager.deepCloneWithNewRefs(prev.chapters || []);
         let nextChapterIndex = prev.currentChapterIndex;
         let storyToShow = [];
         
-        // Handle chapter transitions
-        if (response.chapterEnded && response.nextChapter) {
+        // Handle chapter transitions - MODIFIED for manual chapter progression
+        if (response.chapterEnded) {
           // Complete the current chapter
           if (updatedChapters[prev.currentChapterIndex]) {
             updatedChapters[prev.currentChapterIndex] = {
@@ -226,46 +262,125 @@ function App() {
             };
           }
           
-          // Create new chapter
-          const newChapter = {
-            id: updatedChapters.length,
-            title: response.nextChapter.title,
-            summary: "",
-            segments: [0],  // Start with index 0 in this chapter
-            storedSegments: { 0: newStory }  // Store segment directly in chapter
-          };
+          // Instead of creating new chapter immediately, store the next chapter info
+          setNextChapter({
+            title: response.nextChapterTitle || response.nextChapter?.title || `Chapter ${prev.chapters.length + 1}`,
+            pendingPlayerIndex: response.nextPlayerIndex
+          });
           
-          updatedChapters.push(newChapter);
-          nextChapterIndex = updatedChapters.length - 1;
+          // Add new segment to current display
+          storyToShow = [...prev.storyProgress, chapterManager.deepCloneWithNewRefs(newStory)];
           
-          // Show only the first segment of new chapter
-          storyToShow = [deepCloneWithNewRefs(newStory)];
-          
-          // Update viewing chapter to new chapter
-          setViewingChapterIndex(nextChapterIndex);
-          
-        } else {
           // Add segment to current chapter
-          const result = addSegmentToChapter(updatedChapters, newStory, prev.currentChapterIndex);
+          const result = chapterManager.addSegmentToChapter(updatedChapters, newStory, prev.currentChapterIndex);
+          updatedChapters = result.chapters;
+          
+          return {
+            ...prev,
+            storyProgress: storyToShow,
+            chapters: updatedChapters,
+            roundsInCurrentChapter: response.roundsInChapter || 0,
+            readyForNewChapter: true  // Flag indicating we're ready for new chapter
+          };
+        } else {
+          // Regular flow for mid-chapter actions
+          // Add segment to current chapter
+          const result = chapterManager.addSegmentToChapter(updatedChapters, newStory, prev.currentChapterIndex);
           updatedChapters = result.chapters;
           
           // Add new segment to current display
-          storyToShow = [...prev.storyProgress, deepCloneWithNewRefs(newStory)];
+          storyToShow = [...prev.storyProgress, chapterManager.deepCloneWithNewRefs(newStory)];
+          
+          return {
+            ...prev,
+            storyProgress: storyToShow,
+            currentPlayerIndex: response.nextPlayerIndex,
+            chapters: updatedChapters,
+            currentChapterIndex: nextChapterIndex,
+            roundsInCurrentChapter: response.roundsInChapter || 0
+          };
         }
-        
-        return {
-          ...prev,
-          storyProgress: storyToShow,
-          currentPlayerIndex: response.nextPlayerIndex,
-          chapters: updatedChapters,
-          currentChapterIndex: nextChapterIndex,
-          roundsInCurrentChapter: response.chapterEnded ? 0 : (response.roundsInChapter || 0)
-        };
       });
       
       setCurrentAction(null);
     } catch (err) {
       setError('Failed to process action. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // New function to handle starting the next chapter
+  const handleStartNewChapter = async () => {
+    if (loading || !nextChapter) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Starting new chapter with title:", nextChapter.title);
+      
+      // Generate the first segment of the new chapter
+      const newChapterResponse = await api.startNewChapter(
+        // Pass a simplified gameState to avoid circular references
+        {
+          settings: gameState.settings,
+          characters: gameState.characters.map(c => ({
+            name: c.name,
+            race: c.race,
+            characterClass: c.characterClass,
+            gender: c.gender,
+            icon: null // Don't send huge base64 strings
+          })),
+          currentPlayerIndex: nextChapter.pendingPlayerIndex
+        },
+        nextChapter.title
+      );
+      
+      setGameState(prev => {
+        // Create new chapter object with proper title from nextChapter
+        const newChapter = {
+          id: prev.chapters.length,
+          title: nextChapter.title, // Ensure title is properly set
+          summary: "",
+          segments: [0],
+          storedSegments: { 
+            0: {
+              ...newChapterResponse.storyUpdate,
+              _id: `segment-${Date.now()}-${Math.random()}`,
+              timestamp: Date.now(),
+              chapterId: prev.chapters.length
+            } 
+          }
+        };
+        
+        // Add the new chapter to the chapters array
+        const updatedChapters = [...prev.chapters, newChapter];
+        const nextChapterIndex = updatedChapters.length - 1;
+        
+        // Create new story progress with just the new segment
+        const newStoryProgress = [chapterManager.deepCloneWithNewRefs(newChapter.storedSegments[0])];
+        
+        // Update viewing chapter index too
+        setViewingChapterIndex(nextChapterIndex);
+        
+        return {
+          ...prev,
+          storyProgress: newStoryProgress,
+          currentPlayerIndex: nextChapter.pendingPlayerIndex,
+          chapters: updatedChapters,
+          currentChapterIndex: nextChapterIndex,
+          roundsInCurrentChapter: 0,
+          readyForNewChapter: false
+        };
+      });
+      
+      // Clear next chapter info
+      setNextChapter(null);
+      
+    } catch (err) {
+      setError('Failed to start new chapter. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -302,7 +417,7 @@ function App() {
         // Current chapter - rebuild from stored segments
         newStoryProgress = (targetChapter.segments || []).map(segIdx => {
           if (targetChapter.storedSegments && targetChapter.storedSegments[segIdx]) {
-            return deepCloneWithNewRefs(targetChapter.storedSegments[segIdx]);
+            return chapterManager.deepCloneWithNewRefs(targetChapter.storedSegments[segIdx]);
           }
           return null;
         }).filter(Boolean);
@@ -343,6 +458,8 @@ function App() {
         setGameState={setGameState} 
         handleActionChoice={handleActionChoice} 
         handleViewChapter={handleViewChapter}
+        handleStartNewChapter={handleStartNewChapter} // Pass the new function
+        nextChapter={nextChapter} // Pass next chapter info
         viewingChapterIndex={viewingChapterIndex}
         loading={loading} 
         error={error} 

@@ -1,95 +1,112 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-export const api = {
-  // Get available character options
-  async getCharacterOptions() {
-    const response = await fetch(`${API_BASE_URL}/generate-character-options`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
+// Improve error handling in API calls
+const callApi = async (endpoint, method = 'GET', body = null) => {
+  try {
+    console.log(`[API] Calling ${method} ${API_BASE_URL}/${endpoint}`, body);
     
+    const headers = { 'Content-Type': 'application/json' };
+    const config = {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/${endpoint}`, config);
+    
+    // Log response status
+    console.log(`[API] Response from ${endpoint}: status ${response.status}`);
+    
+    // Handle non-OK responses
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to get character options');
+      let errorDetail = `HTTP error: ${response.status}`;
+      let errorData = {};
+      
+      try {
+        errorData = await response.json();
+        errorDetail = errorData.detail || errorDetail;
+      } catch (e) {
+        // Unable to parse error as JSON
+      }
+      
+      // Create better error message
+      const error = new Error(`API Error: ${errorDetail}`);
+      error.status = response.status;
+      error.responseData = errorData;
+      throw error;
     }
     
-    return response.json();
-  },
-  
-  // Generate character icon
-  async generateCharacterIcon(character) {
-    const response = await fetch(`${API_BASE_URL}/generate-character-icon`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ character })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to generate character icon');
-    }
-    
-    return response.json();
-  },
-  
-  // Start a new game
-  async startGame(gameState) {
-    const response = await fetch(`${API_BASE_URL}/start-game`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gameState)
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to start game');
+    // Handle empty responses
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn(`[API] Non-JSON response from ${endpoint}`);
+      return {};
     }
     
     const data = await response.json();
-    
-    // Initialize chapters if missing from response or missing title
-    if (data.chapter) {
-      if (!data.chapter.title) {
-        data.chapter.title = "Adventure Begins";
+    console.log(`[API] Data received from ${endpoint}:`, data);
+    return data;
+  } catch (error) {
+    console.error(`[API] Error in ${endpoint}:`, error);
+    throw error;
+  }
+};
+
+export const api = {
+  async getCharacterOptions() {
+    try {
+      console.log('[API] Getting character options');
+      // Handle potential empty response
+      const data = await callApi('generate-character-options', 'POST');
+      if (!data || (!data.races && !data.classes)) {
+        console.warn('[API] Received empty character options, using defaults');
+        return {
+          races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+          classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+        };
       }
-    } else {
-      // Create a default chapter if none exists
-      data.chapter = {
-        id: 0,
-        title: "Adventure Begins",
-        summary: "",
-        segments: [0]
+      return data;
+    } catch (error) {
+      console.error('[API] Failed to get character options:', error);
+      // Return default options on error
+      return {
+        races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+        classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
       };
     }
-    
-    return data;
   },
   
-  // Take a player action
+  async generateCharacterIcon(character) {
+    return callApi('generate-character-icon', 'POST', { character });
+  },
+  
+  async startGame(gameState) {
+    return callApi('start-game', 'POST', gameState);
+  },
+  
   async takeAction(gameState, choiceId) {
-    const response = await fetch(`${API_BASE_URL}/take-action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gameState, choiceId })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to process action');
-    }
-    
-    return response.json();
+    return callApi('take-action', 'POST', { gameState, choiceId });
   },
   
-  // Get available models
   async getModels() {
-    const response = await fetch(`${API_BASE_URL}/models`);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to get models');
+    return callApi('models');
+  },
+  
+  async startNewChapter(gameState, nextChapterTitle) {
+    try {
+      // Clean up gameState to make it more compatible with backend
+      const cleanGameState = JSON.parse(JSON.stringify(gameState));
+      
+      // Make sure data matches the expected format for Pydantic model
+      const requestData = {
+        gameState: cleanGameState,
+        nextChapterTitle: nextChapterTitle || "The Next Chapter"
+      };
+      
+      return await callApi('start-new-chapter', 'POST', requestData);
+    } catch (error) {
+      console.error('[API] Failed to start new chapter:', error);
+      throw error;
     }
-    
-    return response.json();
   }
 };

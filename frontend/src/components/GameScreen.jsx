@@ -8,6 +8,8 @@ const GameScreen = ({
   setGameState, 
   handleActionChoice, 
   handleViewChapter,
+  handleStartNewChapter, // New prop
+  nextChapter, // New prop
   viewingChapterIndex,
   loading, 
   error, 
@@ -30,11 +32,16 @@ const GameScreen = ({
   // Check if chapters are available
   const hasChapters = gameState.chapters && gameState.chapters.length > 0;
 
-  // Function to format chapter titles - keep them short
-  const formatChapterTitle = (title) => {
-    if (!title) return "Adventure";
-    if (title.length > 50) return title.substring(0, 50) + "...";
-    return title;
+  // Improved function to format chapter titles - use same format everywhere
+  const formatChapterTitle = (title, index) => {
+    // Default to "Chapter X" if no title provided
+    if (!title || title.trim() === '') {
+      return `Chapter ${index + 1}`;
+    }
+    
+    // Truncate if longer than 50 chars
+    const displayTitle = title.length > 50 ? title.substring(0, 50) + "..." : title;
+    return displayTitle;
   };
 
   // Create a modified chapter handler that checks loading state
@@ -51,7 +58,7 @@ const GameScreen = ({
       <div className="sticky-chapter-header">
         <h2>
           {viewingChapter ? (
-            <>Chapter {viewingChapterIndex + 1}: {formatChapterTitle(viewingChapter.title)}</>
+            <>Chapter {viewingChapterIndex + 1}: {formatChapterTitle(viewingChapter.title, viewingChapterIndex)}</>
           ) : (
             <>Chapter 1: Adventure Begins</>
           )}
@@ -71,7 +78,8 @@ const GameScreen = ({
                   onClick={() => handleChapterClick(index)}
                   style={loading ? {cursor: 'not-allowed', opacity: '0.6'} : {}}
                 >
-                  <h4>Chapter {index + 1}: {formatChapterTitle(chapter.title || "Chapter")}</h4>
+                  {/* Use the same formatting for chapter titles in sidebar */}
+                  <h4>Chapter {index + 1}: {formatChapterTitle(chapter.title, index)}</h4>
                 </div>
               ))
             ) : (
@@ -205,21 +213,39 @@ const GameScreen = ({
               </div>
               
               <div className="action-choices">
-                <h3>Choose Your Action:</h3>
-                
-                {/* Show action buttons when not loading */}
-                {!loading && gameState.storyProgress.length > 0 && 
-                 gameState.storyProgress[gameState.storyProgress.length - 1].choices && 
-                 gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
-                  <button 
-                    key={choice.id} 
-                    className={`action-button ${currentAction === choice.id ? 'selected' : ''}`}
-                    onClick={() => handleActionChoice(choice.id)}
-                    disabled={loading}
-                  >
-                    {choice.text}
-                  </button>
-                ))}
+                {/* Display "Start New Chapter" button if chapter is ready to end */}
+                {gameState.readyForNewChapter && nextChapter ? (
+                  <div className="new-chapter-container">
+                    <h3>Chapter Complete!</h3>
+                    <p>The story continues in the next chapter...</p>
+                    <button 
+                      className="new-chapter-button"
+                      onClick={handleStartNewChapter}
+                      disabled={loading}
+                    >
+                      {/* Use nextChapter.title directly instead of "Chapter" */}
+                      Start Chapter {gameState.chapters.length + 1}: {nextChapter.title}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h3>Choose Your Action:</h3>
+                    
+                    {/* Show action buttons when not loading */}
+                    {!loading && gameState.storyProgress.length > 0 && 
+                     gameState.storyProgress[gameState.storyProgress.length - 1].choices && 
+                     gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
+                      <button 
+                        key={choice.id} 
+                        className={`action-button ${currentAction === choice.id ? 'selected' : ''}`}
+                        onClick={() => handleActionChoice(choice.id)}
+                        disabled={loading}
+                      >
+                        {choice.text}
+                      </button>
+                    ))}
+                  </>
+                )}
                 
                 {/* Enhanced loading indicator in action area */}
                 {loading && (
