@@ -273,8 +273,11 @@ function App() {
     }
   };
   
-  // Function to switch to a specific chapter view
+  // Function to switch to a specific chapter view - add loading check
   const handleViewChapter = (chapterIndex) => {
+    // Don't allow chapter changes while loading
+    if (loading) return;
+    
     setViewingChapterIndex(chapterIndex);
     
     setGameState(prev => {

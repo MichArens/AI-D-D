@@ -36,6 +36,14 @@ const GameScreen = ({
     if (title.length > 50) return title.substring(0, 50) + "...";
     return title;
   };
+
+  // Create a modified chapter handler that checks loading state
+  const handleChapterClick = (index) => {
+    if (loading) {
+      return; // Prevent navigation if story is loading
+    }
+    handleViewChapter(index);
+  };
   
   return (
     <div className="game-screen">
@@ -59,10 +67,10 @@ const GameScreen = ({
               gameState.chapters.map((chapter, index) => (
                 <div 
                   key={index} 
-                  className={`chapter-item ${index === viewingChapterIndex ? 'active-chapter' : ''}`}
-                  onClick={() => handleViewChapter(index)}
+                  className={`chapter-item ${index === viewingChapterIndex ? 'active-chapter' : ''} ${loading ? 'disabled' : ''}`}
+                  onClick={() => handleChapterClick(index)}
+                  style={loading ? {cursor: 'not-allowed', opacity: '0.6'} : {}}
                 >
-                  {/* Only show chapter title in sidebar */}
                   <h4>Chapter {index + 1}: {formatChapterTitle(chapter.title || "Chapter")}</h4>
                 </div>
               ))
@@ -86,13 +94,13 @@ const GameScreen = ({
                   isPlaying={activeTTS === 'summary'} 
                 />
                 
-                {/* Add TTS button for the summary */}
                 {gameState.settings.enableTTS && gameState.storyProgress[0].text && (
                   <button 
                     className={`tts-button ${activeTTS === 'summary' ? 'tts-active' : ''}`}
                     onClick={() => toggleTTS('summary')}
                     title={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
                     aria-label={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
+                    disabled={loading}
                   >
                     {activeTTS === 'summary' ? <SpeakerMuteIcon /> : <SpeakerIcon />}
                   </button>
@@ -115,8 +123,6 @@ const GameScreen = ({
                 segment.chapterId !== (gameState.storyProgress[index-1]?.chapterId || -1) ? 
                 'new-chapter' : ''}`}
             >
-              {/* Remove chapter headers inside the story segments */}
-              
               <div className="story-text">
                 {/* Player action info */}
                 {segment.player && segment.action && (
@@ -148,6 +154,7 @@ const GameScreen = ({
                     onClick={() => toggleTTS(index)}
                     title={activeTTS === index ? "Stop Narration" : "Play Narration"}
                     aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                    disabled={loading}
                   >
                     {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
                   </button>
@@ -163,9 +170,6 @@ const GameScreen = ({
         </div>
         
         <div className="action-panel">
-          {/* Remove the redundant chapter info section */}
-          
-          {/* Only show player actions if viewing current chapter */}
           {!isViewingPastChapter ? (
             <>
               <div className="current-player">
@@ -197,7 +201,8 @@ const GameScreen = ({
               <div className="action-choices">
                 <h3>Choose Your Action:</h3>
                 
-                {gameState.storyProgress.length > 0 && 
+                {/* Show action buttons when not loading */}
+                {!loading && gameState.storyProgress.length > 0 && 
                  gameState.storyProgress[gameState.storyProgress.length - 1].choices && 
                  gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
                   <button 
@@ -210,7 +215,16 @@ const GameScreen = ({
                   </button>
                 ))}
                 
-                {loading && <div className="loading-message">Generating story...</div>}
+                {/* Enhanced loading indicator in action area */}
+                {loading && (
+                  <div className="action-loading-container">
+                    <div className="loading-spinner"></div>
+                    <div className="loading-message">
+                      <p>Generating next part of your adventure...</p>
+                      <p className="loading-submessage">The Dungeon Master is thinking...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -218,10 +232,14 @@ const GameScreen = ({
               <p>You are viewing a past chapter.</p>
               <button 
                 className="main-button return-button"
-                onClick={() => handleViewChapter(gameState.currentChapterIndex)}
+                onClick={() => handleChapterClick(gameState.currentChapterIndex)}
+                disabled={loading}
               >
                 Return to Current Chapter
               </button>
+              {loading && (
+                <div className="loading-message">Please wait until the story generation is complete...</div>
+              )}
             </div>
           )}
         </div>

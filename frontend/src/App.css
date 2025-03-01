@@ -133,8 +133,9 @@ button:disabled {
 .loading-message {
   color: var(--accent-gold);
   text-align: center;
-  margin: 15px 0;
-  font-style: italic;
+  margin: 10px 0;
+  font-weight: bold;
+  font-size: 1.1rem;
 }
 
 /* Setup Screen */
@@ -314,6 +315,7 @@ button:disabled {
   box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: var(--primary-red) var(--primary-dark);
+  position: relative; /* Needed for absolute positioning of loading overlay */
 }
 
 .story-container::-webkit-scrollbar {
@@ -436,6 +438,7 @@ button:disabled {
   padding: 20px;
   height: 100%;
   box-sizing: border-box;
+  position: relative;
 }
 
 .current-player {
@@ -563,7 +566,7 @@ button:disabled {
   margin: 0;
   margin-bottom: 15px;
   text-align: center;
-  border-bottom: 3px double var(--primary-red);
+  border-bottom: 3px double var (--primary-red);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
@@ -655,6 +658,10 @@ button:disabled {
   border: 1px solid var(--accent-gold);
 }
 
+.chapter-item.disabled {
+  pointer-events: none;
+}
+
 .history-badge {
   font-size: 0.8rem;
   background-color: var(--accent-gold);
@@ -727,6 +734,37 @@ button:disabled {
   bottom: 10px;
   left: 10px;
   margin-top: 0;
+}
+
+.loading-overlay {
+  display: none; /* Hide the story container overlay */
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(212, 175, 55, 0.3);
+  border-top: 4px solid var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 1.5s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.action-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 15px;
+  background-color: rgba(26, 10, 10, 0.6);
+  border: 1px solid var(--accent-gold);
+  border-radius: 8px;
+  margin: 15px 0;
 }
 
 /* Media Queries */
