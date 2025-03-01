@@ -173,7 +173,7 @@ button:disabled {
   border: 1px solid var(--gray-dark);
   border-radius: 4px;
   background-color: var(--off-white);
-  color: var(--primary-dark);
+  color: var (--primary-dark);
   font-family: var (--body-font);
 }
 
@@ -705,6 +705,20 @@ button:disabled {
 .return-button {
   width: 100%;
   margin-top: 10px;
+}
+
+/* Make sure the story text in chapter summary has proper positioning for the TTS button */
+.chapter-summary-view .story-text {
+  position: relative;
+  padding-bottom: 50px; /* Add space for the TTS button */
+}
+
+/* Position the TTS button at the bottom left of the summary text */
+.chapter-summary-view .story-text .tts-button {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  margin-top: 0;
 }
 
 /* Media Queries */

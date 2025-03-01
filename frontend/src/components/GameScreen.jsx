@@ -32,7 +32,6 @@ const GameScreen = ({
             Chapter {viewingChapterIndex + 1}: {viewingChapter.title}
             {isViewingPastChapter && <span className="history-badge">History Mode</span>}
           </h2>
-          {/* Remove the return button from the sticky header */}
         </div>
       )}
       
@@ -59,7 +58,23 @@ const GameScreen = ({
             <div className="chapter-summary-view">
               <h3>Chapter Summary</h3>
               <div className="story-text">
-                <p>{gameState.storyProgress[0].text}</p>
+                <HighlightedText 
+                  text={gameState.storyProgress[0].text} 
+                  activeTTS={activeTTS} 
+                  isPlaying={activeTTS === 'summary'} 
+                />
+                
+                {/* Add TTS button for the summary */}
+                {gameState.settings.enableTTS && gameState.storyProgress[0].text && (
+                  <button 
+                    className={`tts-button ${activeTTS === 'summary' ? 'tts-active' : ''}`}
+                    onClick={() => toggleTTS('summary')}
+                    title={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
+                    aria-label={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
+                  >
+                    {activeTTS === 'summary' ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                  </button>
+                )}
               </div>
               {gameState.storyProgress[0].image && (
                 <div className="story-image centered-image">
