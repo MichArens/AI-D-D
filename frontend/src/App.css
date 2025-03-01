@@ -136,6 +136,15 @@ button:disabled {
   margin: 10px 0;
   font-weight: bold;
   font-size: 1.1rem;
+  font-family: var(--body-font); /* Add explicit font family */
+}
+
+.loading-submessage {
+  opacity: 0.8;
+  font-size: 0.9rem;
+  font-style: italic;
+  margin-top: 5px;
+  font-family: var(--body-font); /* Add explicit font family */
 }
 
 /* Setup Screen */
@@ -441,6 +450,12 @@ button:disabled {
   position: relative;
 }
 
+.action-panel p, 
+.action-panel span,
+.action-panel div {
+  font-family: var(--body-font); /* Add explicit font family */
+}
+
 .current-player {
   margin-top: 25px;
   margin-bottom: 30px;
@@ -487,6 +502,8 @@ button:disabled {
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.2s ease;
+  font-family: var(--body-font); /* Explicitly set font to ensure consistency */
+  font-weight: bold; /* Matching button style */
 }
 
 .action-button:hover:not(:disabled) {
@@ -765,6 +782,7 @@ button:disabled {
   border: 1px solid var(--accent-gold);
   border-radius: 8px;
   margin: 15px 0;
+  font-family: var(--body-font); /* Add explicit font family */
 }
 
 /* Media Queries */
