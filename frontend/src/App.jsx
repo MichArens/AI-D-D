@@ -1,66 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-
-// API service
-const API_BASE_URL = 'http://localhost:8000/api';
-
-const api = {
-  async getModels() {
-    const response = await fetch(`${API_BASE_URL}/models`);
-    return response.json();
-  },
-  
-  async getCharacterOptions() {
-    const response = await fetch(`${API_BASE_URL}/generate-character-options`, {
-      method: 'POST'
-    });
-    return response.json();
-  },
-  
-  async generateCharacterIcon(character) {
-    const response = await fetch(`${API_BASE_URL}/generate-character-icon`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ character })
-    });
-    return response.json();
-  },
-  
-  async startGame(gameState) {
-    const response = await fetch(`${API_BASE_URL}/start-game`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gameState)
-    });
-    return response.json();
-  },
-  
-  async takeAction(gameState, choiceId) {
-    const response = await fetch(`${API_BASE_URL}/take-action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gameState, choiceId })
-    });
-    return response.json();
-  }
-};
-
-// Speaker Icons as SVG Components
-const SpeakerIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-  </svg>
-);
-
-const SpeakerMuteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-    <line x1="23" y1="9" x2="17" y2="15"></line>
-    <line x1="17" y1="9" x2="23" y2="15"></line>
-  </svg>
-);
+import SetupScreen from './components/SetupScreen';
+import CharacterScreen from './components/CharacterScreen';
+import GameScreen from './components/GameScreen';
+import { api } from './services/api';
+import { toggleTTS } from './utils/tts';
 
 // App Component
 function App() {
@@ -86,7 +30,6 @@ function App() {
   const [currentAction, setCurrentAction] = useState(null);
   const [activeTTS, setActiveTTS] = useState(null); // Track which story segment is being spoken
   const storyRef = useRef(null);
-  const speechSynthesisRef = useRef(null);
   
   // Load available models on startup
   useEffect(() => {
@@ -132,79 +75,8 @@ function App() {
   
   // Text-to-speech toggle function
   // Replace your existing toggleTTS function with this:
-const toggleTTS = (index) => {
-    // If speech synthesis is not available, return
-    if (!window.speechSynthesis) return;
-    
-    // If this is the currently active TTS segment
-    if (activeTTS === index) {
-      // Stop the speech
-      window.speechSynthesis.cancel();
-      setActiveTTS(null);
-      return;
-    }
-    
-    // If another TTS is active, stop it
-    if (activeTTS !== null) {
-      window.speechSynthesis.cancel();
-    }
-    
-    // Just set the active TTS index - the component will handle the speech
-    setActiveTTS(index);
-  };
-  
-  // Place this after your SpeakerMuteIcon component but before the App function
-const HighlightedText = ({ text, activeTTS, isPlaying }) => {
-    const [currentWordIndex, setCurrentWordIndex] = useState(-1);
-    const words = text.split(/\s+/);
-    const utteranceRef = useRef(null);
-    
-    useEffect(() => {
-      if (!isPlaying) {
-        setCurrentWordIndex(-1);
-        return;
-      }
-      
-      // Initialize speech synthesis with word boundary detection
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9; // Match your existing rate
-      
-      // Track word boundaries
-      utterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          // Calculate which word we're on
-          const upToIndex = text.substring(0, event.charIndex).split(/\s+/).length - 1;
-          setCurrentWordIndex(upToIndex);
-        }
-      };
-      
-      utterance.onend = () => {
-        setCurrentWordIndex(-1);
-      };
-      
-      // Store reference and start speaking
-      utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-      
-      return () => {
-        window.speechSynthesis.cancel();
-      };
-    }, [isPlaying, text]);
-    
-    return (
-      <p>
-        {words.map((word, index) => (
-          <React.Fragment key={index}>
-            <span 
-              className={currentWordIndex === index ? "highlighted-word" : ""}
-            >
-              {word}
-            </span>
-            {index < words.length - 1 ? ' ' : ''}
-          </React.Fragment>
-        ))}
-      </p>
-    );
+  const handleToggleTTS = (index) => {
+    toggleTTS(index, activeTTS, setActiveTTS);
   };
 
   // Navigate to character creation
@@ -341,280 +213,39 @@ const HighlightedText = ({ text, activeTTS, isPlaying }) => {
     }
   };
   
-  // Render Setup Screen
-  const renderSetupScreen = () => (
-    <div className="setup-screen">
-      <h1>D&D AI Adventure</h1>
-      <div className="setup-form">
-        <div className="setup-section">
-          <h2>Game Settings</h2>
-          
-          <div className="form-group">
-            <label>Number of Players:</label>
-            <select 
-              value={gameState.settings.playerCount}
-              onChange={(e) => handleSettingsChange('playerCount', parseInt(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5, 6].map(num => (
-                <option key={num} value={num}>{num}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="form-group">
-            <label>AI Model:</label>
-            <select 
-              value={gameState.settings.aiModel}
-              onChange={(e) => handleSettingsChange('aiModel', e.target.value)}
-            >
-              {availableModels.map(model => (
-                <option key={model} value={model}>{model}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="features-group">
-            <div className="feature-toggle">
-              <input 
-                type="checkbox" 
-                id="enableImages" 
-                checked={gameState.settings.enableImages}
-                onChange={(e) => handleSettingsChange('enableImages', e.target.checked)}
-              />
-              <label htmlFor="enableImages">Enable Image Generation</label>
-            </div>
-            
-            <div className="feature-toggle">
-              <input 
-                type="checkbox" 
-                id="enableTTS" 
-                checked={gameState.settings.enableTTS}
-                onChange={(e) => handleSettingsChange('enableTTS', e.target.checked)}
-              />
-              <label htmlFor="enableTTS">Enable Text-to-Speech Narration</label>
-            </div>
-            
-            <div className="feature-toggle">
-              <input 
-                type="checkbox" 
-                id="enableMusic" 
-                checked={gameState.settings.enableMusic}
-                onChange={(e) => handleSettingsChange('enableMusic', e.target.checked)}
-              />
-              <label htmlFor="enableMusic">Enable Background Music</label>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="actions">
-        <button 
-          className="main-button" 
-          onClick={handleStartSetup}
-          disabled={loading}
-        >
-          {loading ? 'Loading...' : 'Continue to Character Creation'}
-        </button>
-      </div>
-      
-      {error && <div className="error-message">{error}</div>}
-    </div>
-  );
-  
-  // Render Character Creation Screen
-  const renderCharacterScreen = () => (
-    <div className="character-screen">
-      <h1>Character Creation</h1>
-      
-      <div className="character-form">
-        {gameState.characters.map((character, index) => (
-          <div key={index} className="character-card">
-            <h3>Player {index + 1}</h3>
-            
-            <div className="form-group">
-              <label>Character Name:</label>
-              <input 
-                type="text" 
-                value={character.name || ''}
-                onChange={(e) => handleCharacterChange(index, 'name', e.target.value)}
-                placeholder="Enter name"
-              />
-            </div>
-            
-            <div className="form-group">
-              <label>Race:</label>
-              <select 
-                value={character.race || ''}
-                onChange={(e) => handleCharacterChange(index, 'race', e.target.value)}
-              >
-                <option value="">Select Race</option>
-                {characterOptions?.races?.map(race => (
-                  <option key={race} value={race}>{race}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label>Class:</label>
-              <select 
-                value={character.characterClass || ''}
-                onChange={(e) => handleCharacterChange(index, 'characterClass', e.target.value)}
-              >
-                <option value="">Select Class</option>
-                {characterOptions?.classes?.map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Gender:</label>
-              <select
-                value={character.gender || ''}
-                onChange={(e) => handleCharacterChange(index, 'gender', e.target.value)}
-              >
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      <div className="actions">
-        <button 
-          className="secondary-button" 
-          onClick={() => setScreen('setup')}
-          disabled={loading}
-        >
-          Back
-        </button>
-        <button 
-          className="main-button" 
-          onClick={handleStartGame}
-          disabled={loading || !areCharactersComplete()}
-        >
-          {loading ? 'Creating Adventure...' : 'Start Adventure!'}
-        </button>
-      </div>
-      
-      {error && <div className="error-message">{error}</div>}
-      {!areCharactersComplete() && (
-        <div className="info-message">All characters must have a name, race, and class.</div>
-      )}
-    </div>
-  );
-  
-  // Render Main Game Screen
-  const renderGameScreen = () => (
-    <div className="game-screen">
-      <div className="game-layout">
-        <div className="story-container" ref={storyRef}>
-          {gameState.storyProgress.map((segment, index) => (
-            <div key={index} className="story-segment">
-              <div className="story-text">
-                {segment.player && segment.action && (
-                  <div className="player-action">
-                    <div className="player-icon">
-                      {gameState.characters.find(c => c.name === segment.player)?.icon ? (
-                        <img 
-                          src={`data:image/png;base64,${gameState.characters.find(c => c.name === segment.player)?.icon}`} 
-                          alt={segment.player} 
-                        />
-                      ) : (
-                        <div className="icon-placeholder">{segment.player[0]}</div>
-                      )}
-                    </div>
-                    <p><strong>{segment.player}</strong> chose to {segment.action}</p>
-                  </div>
-                )}
-                
-                <HighlightedText 
-                    text={segment.text} 
-                    activeTTS={activeTTS} 
-                    isPlaying={activeTTS === index} 
-                />
-                
-                {/* TTS Button with speaker icons */}
-                {gameState.settings.enableTTS && segment.text && (
-                  <button 
-                    className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
-                    onClick={() => toggleTTS(index)}
-                    title={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                    aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                  >
-                    {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
-                  </button>
-                )}
-              </div>
-              {segment.image && (
-                <div className="story-image">
-                  <img src={`data:image/png;base64,${segment.image}`} alt="Scene" />
-                </div>
-              )}
-            </div>
-          ))}
-          {/* End of story segments mapping */}
-        </div>
-        
-        <div className="action-panel">
-          <div className="current-player">
-            {gameState.characters[gameState.currentPlayerIndex] && (
-              <>
-                <h3>Current Player: 
-                  <span className="player-name">{gameState.characters[gameState.currentPlayerIndex].name}</span>
-                </h3>
-                <div className="player-info">
-                  {gameState.characters[gameState.currentPlayerIndex].icon ? (
-                    <img 
-                      src={`data:image/png;base64,${gameState.characters[gameState.currentPlayerIndex].icon}`} 
-                      alt={gameState.characters[gameState.currentPlayerIndex].name} 
-                      className="active-player-icon"
-                    />
-                  ) : (
-                    <div className="icon-placeholder active">
-                      {gameState.characters[gameState.currentPlayerIndex].name[0]}
-                    </div>
-                  )}
-                  <div className="player-details">
-                    <p>{gameState.characters[gameState.currentPlayerIndex].race} {gameState.characters[gameState.currentPlayerIndex].characterClass}</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          
-          <div className="action-choices">
-            <h3>Choose Your Action:</h3>
-            
-            {gameState.storyProgress.length > 0 && 
-             gameState.storyProgress[gameState.storyProgress.length - 1].choices && 
-             gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
-              <button 
-                key={choice.id} 
-                className={`action-button ${currentAction === choice.id ? 'selected' : ''}`}
-                onClick={() => handleActionChoice(choice.id)}
-                disabled={loading}
-              >
-                {choice.text}
-              </button>
-            ))}
-            
-            {loading && <div className="loading-message">Generating story...</div>}
-          </div>
-        </div>
-      </div>
-      
-      {error && <div className="error-message">{error}</div>}
-    </div>
-  );
-  
   return (
     <div className="dnd-app">
-      {screen === 'setup' && renderSetupScreen()}
-      {screen === 'character' && renderCharacterScreen()}
-      {screen === 'game' && renderGameScreen()}
+      {screen === 'setup' && <SetupScreen 
+        gameState={gameState} 
+        setGameState={setGameState} 
+        availableModels={availableModels} 
+        handleStartSetup={handleStartSetup} 
+        loading={loading} 
+        error={error} 
+        setScreen={setScreen} 
+      />}
+      {screen === 'character' && <CharacterScreen 
+        gameState={gameState} 
+        setGameState={setGameState} 
+        characterOptions={characterOptions} 
+        handleCharacterChange={handleCharacterChange} 
+        handleStartGame={handleStartGame} 
+        loading={loading} 
+        error={error} 
+        areCharactersComplete={areCharactersComplete} 
+        setScreen={setScreen} 
+      />}
+      {screen === 'game' && <GameScreen 
+        gameState={gameState} 
+        setGameState={setGameState} 
+        handleActionChoice={handleActionChoice} 
+        loading={loading} 
+        error={error} 
+        currentAction={currentAction} 
+        activeTTS={activeTTS} 
+        toggleTTS={handleToggleTTS} 
+        storyRef={storyRef} 
+      />}
       
       {/* Background music player (hidden) */}
       {gameState.musicUrl && gameState.settings.enableMusic && (
