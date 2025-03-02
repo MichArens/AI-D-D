@@ -68,7 +68,7 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
   
   // Cache the segments
   useEffect(() => {
-    sentencesRef.current = isAITTS ? segments : [];
+    sentencesRef.current = isAITTS ? segments : segments;
   }, [segments, isAITTS]);
   
   useEffect(() => {
@@ -257,8 +257,11 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
         };
       }
     } else {
-      // Handle browser TTS - unchanged
+      // Handle browser TTS - fix highlighting issues
       console.log("Using browser TTS for highlighting");
+      
+      // Cancel any existing speech synthesis first
+      window.speechSynthesis.cancel();
       
       // Create a new utterance for word boundary detection
       const utterance = new SpeechSynthesisUtterance(text);
@@ -268,23 +271,37 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
       utterance.onboundary = (event) => {
         if (event.name === 'word') {
           // Count words up to this position to determine which to highlight
-          const upToIndex = text.substring(0, event.charIndex).split(/\s+/).length - 1;
+          const textUpToIndex = text.substring(0, event.charIndex);
+          const upToIndex = textUpToIndex.split(/\s+/).length - 1;
+          console.log(`Word boundary at char ${event.charIndex}, word index: ${upToIndex}`);
           setCurrentHighlight(upToIndex >= 0 ? upToIndex : 0);
         }
       };
       
       // Reset highlight when done speaking
       utterance.onend = () => {
+        console.log("Web speech synthesis ended");
         setCurrentHighlight(-1);
       };
       
-      // Store reference and start speaking
+      utterance.onerror = (e) => {
+        console.error("Speech synthesis error:", e);
+        setCurrentHighlight(-1);
+      };
+      
+      // Store reference to the utterance object
       utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
+      
+      // Start speaking using the utterance with our attached event handlers
+      try {
+        window.speechSynthesis.speak(utteranceRef.current);
+      } catch (e) {
+        console.error("Failed to start speech synthesis:", e);
+      }
       
       // Clean up on unmount or when isPlaying changes
       return () => {
-        if (!isAITTS && window.speechSynthesis) {
+        if (window.speechSynthesis) {
           window.speechSynthesis.cancel();
         }
       };
