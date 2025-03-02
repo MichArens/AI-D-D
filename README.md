@@ -15,7 +15,7 @@ An AI-powered Dungeons & Dragons adventure game with a React frontend and FastAP
 
 1. Navigate to the backend directory:
    ```bash
-   cd /Users/michaelarens/Documents/projects/dnd5/backend
+   cd backend
    ```
 
 2. Create a Python virtual environment:
@@ -35,14 +35,14 @@ An AI-powered Dungeons & Dragons adventure game with a React frontend and FastAP
 
 4. Install dependencies:
    ```bash
-   pip install fastapi uvicorn python-dotenv
+   pip install -r requirements.txt
    ```
 
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
    ```bash
-   cd /Users/michaelarens/Documents/projects/dnd5/frontend
+   cd frontend
    ```
 
 2. Install dependencies:
@@ -53,13 +53,10 @@ An AI-powered Dungeons & Dragons adventure game with a React frontend and FastAP
 ## Running the Project
 
 ### Start the Backend
-
-1. Run the FastAPI server:
+1. Make sure the venv is active
+2. Run the FastAPI server:
    ```bash
    cd backend
-   python -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
    python app.py
    ```
    
@@ -76,7 +73,6 @@ An AI-powered Dungeons & Dragons adventure game with a React frontend and FastAP
 2. Run the development server:
    ```bash
    cd frontend
-   npm i
    npm start
    ```
 
