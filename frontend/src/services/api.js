@@ -114,7 +114,7 @@ export const api = {
     return callApi('check-music', 'GET');
   },
   
-  async generateTTS(text, voice = 'lewis') {
+  async generateTTS(text, voice = 'bm_george') {
     return callApi('generate-tts', 'POST', { text, voice });
   }
 };

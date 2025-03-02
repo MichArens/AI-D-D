@@ -19,7 +19,7 @@ async def maybe_generate_tts(text, enable_tts=False):
     
     try:
         logger.info(f"Pre-generating TTS for text of length {len(text)}")
-        audio_data = await generate_tts(text, "af_heart")
+        audio_data = await generate_tts(text, "bm_george")
         return audio_data
     except Exception as e:
         logger.error(f"Failed to generate TTS: {e}")
@@ -590,7 +590,7 @@ async def generate_tts_endpoint(request: TTSRequest):
     """Generate text-to-speech audio"""
     try:
         logger.info(f"Generating TTS for text of length: {len(request.text)}")
-        audio_data = await generate_tts(request.text, "af_heart")
+        audio_data = await generate_tts(request.text, "bm_george")
         return {"audioData": audio_data}
     except Exception as e:
         logger.error(f"Error generating TTS: {e}")
