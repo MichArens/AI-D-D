@@ -24,6 +24,13 @@
   box-sizing: border-box;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
 body {
   background-color: #1a0a0a;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23611010' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
@@ -33,15 +40,17 @@ body {
 }
 
 .dnd-app {
-  min-height: 100vh;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
 }
 
 h1, h2, h3 {
   font-family: var(--title-font);
-  color: var(--accent-gold);
+  color: var (--accent-gold);
   margin-bottom: 1rem;
 }
 
@@ -124,8 +133,18 @@ button:disabled {
 .loading-message {
   color: var(--accent-gold);
   text-align: center;
-  margin: 15px 0;
+  margin: 10px 0;
+  font-weight: bold;
+  font-size: 1.1rem;
+  font-family: var(--body-font); /* Add explicit font family */
+}
+
+.loading-submessage {
+  opacity: 0.8;
+  font-size: 0.9rem;
   font-style: italic;
+  margin-top: 5px;
+  font-family: var(--body-font); /* Add explicit font family */
 }
 
 /* Setup Screen */
@@ -164,8 +183,8 @@ button:disabled {
   border: 1px solid var(--gray-dark);
   border-radius: 4px;
   background-color: var(--off-white);
-  color: var(--primary-dark);
-  font-family: var(--body-font);
+  color: var (--primary-dark);
+  font-family: var (--body-font);
 }
 
 .features-group {
@@ -214,27 +233,98 @@ button:disabled {
 
 /* Game Screen */
 .game-screen {
-  height: calc(100vh - 40px);
+  height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
 }
 
 .game-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  display: grid;
+  grid-template-columns: 250px 2fr 1fr;
+  flex: 1;
   gap: 20px;
+  overflow: hidden;
+  height: calc(100vh - 60px); /* Adjusted for sticky header */
 }
 
+/* Chapters Sidebar */
+.chapters-sidebar {
+  width: 250px;
+  background-color: rgba(26, 10, 10, 0.8);
+  border: 2px solid var(--primary-red);
+  border-radius: 8px;
+  padding: 15px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+  max-height: calc(100vh - 120px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-red) var(--primary-dark);
+}
+
+.chapters-sidebar h3 {
+  margin-bottom: 15px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--accent-gold);
+  text-align: center;
+}
+
+.chapter-item {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px dashed var(--primary-red);
+}
+
+.chapter-item:last-child {
+  border-bottom: none;
+}
+
+.chapter-item h4 {
+  margin-bottom: 10px;
+  font-family: var(--title-font);
+  color: var(--accent-gold);
+  font-size: 1rem;
+}
+
+.chapter-image {
+  margin: 10px 0;
+}
+
+.chapter-image img {
+  width: 100%;
+  border-radius: 5px;
+  border: 1px solid var(--accent-gold);
+}
+
+.chapter-item p {
+  font-size: 0.85rem;
+  color: var(--off-white);
+  font-style: italic;
+}
+
+.active-chapter {
+  background-color: rgba(139, 0, 0, 0.3);
+  border-radius: 5px;
+  padding: 10px;
+  margin: -5px;
+}
+
+/* Story container updates for chapters */
 .story-container {
-  flex: 1;
   overflow-y: auto;
   background-color: rgba(26, 10, 10, 0.8);
   border: 2px solid var(--primary-red);
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   padding: 20px;
+  height: 100%;
+  box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: var(--primary-red) var(--primary-dark);
+  position: relative; /* Needed for absolute positioning of loading overlay */
 }
 
 .story-container::-webkit-scrollbar {
@@ -341,16 +431,34 @@ button:disabled {
   font-size: 1.5rem;
 }
 
+.icon-placeholder.active {
+  width: 80px;
+  height: 80px;
+  font-size: 2rem;
+  border: 3px solid var(--accent-gold);
+}
+
 .action-panel {
+  overflow-y: auto;
   background-color: rgba(26, 10, 10, 0.8);
   border: 2px solid var(--primary-red);
   border-radius: 0 0 8px 8px;
   border-top: none;
   padding: 20px;
+  height: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.action-panel p, 
+.action-panel span,
+.action-panel div {
+  font-family: var(--body-font); /* Add explicit font family */
 }
 
 .current-player {
-  margin-bottom: 20px;
+  margin-top: 25px;
+  margin-bottom: 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -375,13 +483,6 @@ button:disabled {
   object-fit: cover;
 }
 
-.icon-placeholder.active {
-  width: 80px;
-  height: 80px;
-  font-size: 2rem;
-  border: 3px solid var(--accent-gold);
-}
-
 .player-details {
   color: var(--off-white);
 }
@@ -401,6 +502,8 @@ button:disabled {
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.2s ease;
+  font-family: var(--body-font); /* Explicitly set font to ensure consistency */
+  font-weight: bold; /* Matching button style */
 }
 
 .action-button:hover:not(:disabled) {
@@ -456,6 +559,298 @@ button:disabled {
     border-radius: 3px;
   }
 
+/* Main Chapter Header */
+.main-chapter-header {
+  text-align: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 3px double var(--primary-red);
+}
+
+.main-chapter-header h2 {
+  font-size: 2rem;
+  color: var(--accent-gold);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+  margin: 0;
+}
+
+.sticky-chapter-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: var(--primary-dark);
+  padding: 15px 0;
+  margin: 0;
+  margin-bottom: 15px;
+  text-align: center;
+  border-bottom: 3px double var (--primary-red);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.sticky-chapter-header h2 {
+  font-size: 2rem;
+  color: var(--accent-gold);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+  margin: 0;
+  padding: 0 15px;
+  border-bottom: none;
+}
+
+.chapter-header {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: rgba(139, 0, 0, 0.3);
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid var(--accent-gold);
+}
+
+.chapter-header h3 {
+  margin: 0;
+  color: var (--accent-gold);
+  font-size: 1.5rem;
+  text-shadow: 1px 1px 2px black;
+}
+
+.current-chapter-info {
+  background-color: rgba(139, 0, 0, 0.15);
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-gold);
+}
+
+.progress-bar {
+  height: 10px;
+  background-color: var(--gray-dark);
+  border-radius: 5px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--accent-gold);
+  transition: width 0.5s ease;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: var (--off-white);
+}
+
+/* Chapter navigation styles */
+.chapters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chapter-item {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px dashed var(--primary-red);
+  background-color: rgba(26, 10, 10, 0.5);
+}
+
+.chapter-item:hover {
+  background-color: rgba(139, 0, 0, 0.3);
+}
+
+.chapter-item h4 {
+  margin-bottom: 0;
+}
+
+.active-chapter {
+  background-color: rgba(139, 0, 0, 0.5);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.4);
+  border: 1px solid var(--accent-gold);
+}
+
+.chapter-item.disabled {
+  pointer-events: none;
+}
+
+.history-badge {
+  font-size: 0.8rem;
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  padding: 3px 8px;
+  border-radius: 10px;
+  margin-left: 10px;
+  font-weight: normal;
+  vertical-align: middle;
+}
+
+.return-to-current {
+  background-color: var(--primary-red);
+  color: var(--off-white);
+  border: 1px solid var(--accent-gold);
+  padding: 5px 10px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.chapter-summary-view {
+  background-color: var(--parchment);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.chapter-summary-view h3 {
+  color: var(--primary-red);
+  text-align: center;
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+}
+
+.centered-image {
+  margin: 20px auto;
+  max-width: 80%;
+}
+
+.history-controls {
+  background-color: rgba(139, 0, 0, 0.1);
+  border: 1px dashed var(--accent-gold);
+  padding: 25px;
+  text-align: center;
+  border-radius: 8px;
+  margin-top: 30px;
+}
+
+.history-controls p {
+  color: var(--accent-gold);
+  font-style: italic;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+}
+
+.return-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Make sure the story text in chapter summary has proper positioning for the TTS button */
+.chapter-summary-view .story-text {
+  position: relative;
+  padding-bottom: 50px; /* Add space for the TTS button */
+}
+
+/* Position the TTS button at the bottom left of the summary text */
+.chapter-summary-view .story-text .tts-button {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  margin-top: 0;
+}
+
+.loading-overlay {
+  display: none; /* Hide the story container overlay */
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(212, 175, 55, 0.3);
+  border-top: 4px solid var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 1.5s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.action-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 15px;
+  background-color: rgba(26, 10, 10, 0.6);
+  border: 1px solid var(--accent-gold);
+  border-radius: 8px;
+  margin: 15px 0;
+  font-family: var(--body-font); /* Add explicit font family */
+}
+
+/* Add styles for the new chapter button */
+.new-chapter-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 25px;
+  background-color: rgba(26, 10, 10, 0.8);
+  border: 2px solid var(--accent-gold);
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.new-chapter-container h3 {
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  color: var(--accent-gold);
+  font-family: var(--title-font);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.new-chapter-container p {
+  margin-bottom: 25px;
+  font-style: italic;
+  color: var(--off-white);
+  font-size: 1.1rem;
+}
+
+/* Make the new-chapter-button extend main-button styling */
+.new-chapter-button {
+  /* Inherit main button styles */
+  background-color: var(--primary-red);
+  color: var(--off-white);
+  font-family: var(--title-font);
+  font-weight: bold;
+  font-size: 1.2rem;
+  padding: 12px 24px;
+  border: 2px solid var(--accent-gold);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  
+  /* Additional button styling to make it special but consistent */
+  width: 100%;
+  margin-top: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.new-chapter-button:hover:not(:disabled) {
+  background-color: var(--secondary-red);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+.new-chapter-button:active:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.new-chapter-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Media Queries */
 @media (min-width: 768px) {
   .game-layout {
@@ -476,6 +871,28 @@ button:disabled {
   
   .features-group {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .game-layout {
+    grid-template-columns: 200px 2fr 1fr;
+  }
+  
+  .chapters-sidebar {
+    width: 200px;
+  }
+}
+
+@media (max-width: 900px) {
+  .game-layout {
+    grid-template-columns: 0 2fr 1fr;
+  }
+  
+  .chapters-sidebar {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
   }
 }
 

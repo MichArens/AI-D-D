@@ -1,66 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-
-// API service
-const API_BASE_URL = 'http://localhost:8000/api';
-
-const api = {
-  async getModels() {
-    const response = await fetch(`${API_BASE_URL}/models`);
-    return response.json();
-  },
-  
-  async getCharacterOptions() {
-    const response = await fetch(`${API_BASE_URL}/generate-character-options`, {
-      method: 'POST'
-    });
-    return response.json();
-  },
-  
-  async generateCharacterIcon(character) {
-    const response = await fetch(`${API_BASE_URL}/generate-character-icon`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ character })
-    });
-    return response.json();
-  },
-  
-  async startGame(gameState) {
-    const response = await fetch(`${API_BASE_URL}/start-game`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(gameState)
-    });
-    return response.json();
-  },
-  
-  async takeAction(gameState, choiceId) {
-    const response = await fetch(`${API_BASE_URL}/take-action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gameState, choiceId })
-    });
-    return response.json();
+import SetupScreen from './components/SetupScreen';
+import CharacterScreen from './components/CharacterScreen';
+import GameScreen from './components/GameScreen';
+import { api } from './services/api';
+import { toggleTTS } from './utils/tts';
+// Conditionally import chapter manager to avoid errors if file doesn't exist
+const chapterManager = (() => {
+  try {
+    return require('./utils/chapter-manager');
+  } catch (e) {
+    console.warn("Chapter manager not found, using fallbacks");
+    return {
+      deepCloneWithNewRefs: obj => JSON.parse(JSON.stringify(obj)),
+      addSegmentToChapter: (chapters, segment, idx) => ({ chapters, allSegments: [] })
+    };
   }
-};
-
-// Speaker Icons as SVG Components
-const SpeakerIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-  </svg>
-);
-
-const SpeakerMuteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-    <line x1="23" y1="9" x2="17" y2="15"></line>
-    <line x1="17" y1="9" x2="23" y2="15"></line>
-  </svg>
-);
+})();
 
 // App Component
 function App() {
@@ -86,7 +42,8 @@ function App() {
   const [currentAction, setCurrentAction] = useState(null);
   const [activeTTS, setActiveTTS] = useState(null); // Track which story segment is being spoken
   const storyRef = useRef(null);
-  const speechSynthesisRef = useRef(null);
+  const [viewingChapterIndex, setViewingChapterIndex] = useState(0);
+  const [nextChapter, setNextChapter] = useState(null);
   
   // Load available models on startup
   useEffect(() => {
@@ -132,95 +89,38 @@ function App() {
   
   // Text-to-speech toggle function
   // Replace your existing toggleTTS function with this:
-const toggleTTS = (index) => {
-    // If speech synthesis is not available, return
-    if (!window.speechSynthesis) return;
-    
-    // If this is the currently active TTS segment
-    if (activeTTS === index) {
-      // Stop the speech
-      window.speechSynthesis.cancel();
-      setActiveTTS(null);
-      return;
-    }
-    
-    // If another TTS is active, stop it
-    if (activeTTS !== null) {
-      window.speechSynthesis.cancel();
-    }
-    
-    // Just set the active TTS index - the component will handle the speech
-    setActiveTTS(index);
-  };
-  
-  // Place this after your SpeakerMuteIcon component but before the App function
-const HighlightedText = ({ text, activeTTS, isPlaying }) => {
-    const [currentWordIndex, setCurrentWordIndex] = useState(-1);
-    const words = text.split(/\s+/);
-    const utteranceRef = useRef(null);
-    
-    useEffect(() => {
-      if (!isPlaying) {
-        setCurrentWordIndex(-1);
-        return;
-      }
-      
-      // Initialize speech synthesis with word boundary detection
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9; // Match your existing rate
-      
-      // Track word boundaries
-      utterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          // Calculate which word we're on
-          const upToIndex = text.substring(0, event.charIndex).split(/\s+/).length - 1;
-          setCurrentWordIndex(upToIndex);
-        }
-      };
-      
-      utterance.onend = () => {
-        setCurrentWordIndex(-1);
-      };
-      
-      // Store reference and start speaking
-      utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-      
-      return () => {
-        window.speechSynthesis.cancel();
-      };
-    }, [isPlaying, text]);
-    
-    return (
-      <p>
-        {words.map((word, index) => (
-          <React.Fragment key={index}>
-            <span 
-              className={currentWordIndex === index ? "highlighted-word" : ""}
-            >
-              {word}
-            </span>
-            {index < words.length - 1 ? ' ' : ''}
-          </React.Fragment>
-        ))}
-      </p>
-    );
+  const handleToggleTTS = (index) => {
+    toggleTTS(index, activeTTS, setActiveTTS);
   };
 
-  // Navigate to character creation
+  // Navigate to character creation - improved error handling 
   const handleStartSetup = async () => {
     setLoading(true);
     setError(null);
+    console.log("Starting setup and fetching character options...");
     
     try {
-      const options = await api.getCharacterOptions();
+      let options;
+      try {
+        options = await api.getCharacterOptions();
+        console.log("Received character options:", options);
+      } catch (optionsError) {
+        console.error("Error fetching character options:", optionsError);
+        options = {
+          races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+          classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+        };
+        setError('Using default character options due to API error.');
+      }
+      
       setCharacterOptions(options);
       
       // Initialize character slots based on player count
-      const initialCharacters = Array(gameState.settings.playerCount).fill(null).map((_, idx) => ({
+      const initialCharacters = Array(gameState.settings?.playerCount || 2).fill(null).map((_, idx) => ({
         name: '',
         race: null,
         characterClass: null,
+        gender: null,
         playerIndex: idx,
         icon: null
       }));
@@ -232,8 +132,8 @@ const HighlightedText = ({ text, activeTTS, isPlaying }) => {
       
       setScreen('character');
     } catch (err) {
-      setError('Failed to initialize character creation. Please try again.');
-      console.error(err);
+      console.error('Failed to initialize character creation:', err);
+      setError(`Failed to initialize character creation: ${err.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -280,32 +180,52 @@ const HighlightedText = ({ text, activeTTS, isPlaying }) => {
       // Initialize the game with the first story segment
       const gameResponse = await api.startGame(gameState);
       
+      // Make sure we have valid initial data
+      if (!gameResponse || !gameResponse.storyUpdate) {
+        throw new Error("Invalid response from server when starting game");
+      }
+      
       setGameState(prev => {
         // Add initial story to progress
-        const newStoryProgress = [...prev.storyProgress];
         const initialStory = { 
           ...gameResponse.storyUpdate,
-          choices: gameResponse.choices
+          choices: gameResponse.choices || [],
+          _id: `initial-${Date.now()}`
         };
-        newStoryProgress.push(initialStory);
+        
+        // Initialize chapter if it exists in response
+        const chapters = gameResponse.chapter ? [gameResponse.chapter] : [{
+          id: 0,
+          title: "Adventure Begins",
+          summary: "",
+          segments: [0],
+          storedSegments: {0: initialStory}
+        }];
         
         return {
           ...prev,
-          storyProgress: newStoryProgress,
-          musicUrl: gameResponse.musicUrl
+          storyProgress: [initialStory],
+          musicUrl: gameResponse.musicUrl,
+          chapters: chapters,
+          currentChapterIndex: 0,
+          roundsInCurrentChapter: 0,
+          viewingChapterIndex: 0
         };
       });
       
+      // Initialize viewing chapter index
+      setViewingChapterIndex(0);
+      
       setScreen('game');
     } catch (err) {
-      setError('Failed to start game. Please try again.');
-      console.error(err);
+      console.error("Start game error:", err);
+      setError('Failed to start game. Please try again. ' + err.message);
     } finally {
       setLoading(false);
     }
   };
   
-  // Handle player action choice
+  // Handle player action choice - modified to support new chapter flow
   const handleActionChoice = async (choiceId) => {
     if (loading) return;
     
@@ -317,19 +237,69 @@ const HighlightedText = ({ text, activeTTS, isPlaying }) => {
       const response = await api.takeAction(gameState, choiceId);
       
       setGameState(prev => {
-        // Add new story segment to progress
-        const newStoryProgress = [...prev.storyProgress];
-        const newStory = { 
+        // Create a new story segment with unique ID
+        const newStory = {
           ...response.storyUpdate,
-          choices: response.choices
+          choices: response.choices,
+          _id: `segment-${Date.now()}-${Math.random()}`,
+          timestamp: Date.now(),
+          player: prev.characters[prev.currentPlayerIndex]?.name,
+          action: prev.storyProgress[prev.storyProgress.length - 1]?.choices?.find(c => c.id === choiceId)?.text
         };
-        newStoryProgress.push(newStory);
         
-        return {
-          ...prev,
-          storyProgress: newStoryProgress,
-          currentPlayerIndex: response.nextPlayerIndex
-        };
+        let updatedChapters = chapterManager.deepCloneWithNewRefs(prev.chapters || []);
+        let nextChapterIndex = prev.currentChapterIndex;
+        let storyToShow = [];
+        
+        // Handle chapter transitions - MODIFIED for manual chapter progression
+        if (response.chapterEnded) {
+          // Complete the current chapter
+          if (updatedChapters[prev.currentChapterIndex]) {
+            updatedChapters[prev.currentChapterIndex] = {
+              ...updatedChapters[prev.currentChapterIndex],
+              summary: response.chapterSummary || "",
+              image: response.chapterImage
+            };
+          }
+          
+          // Instead of creating new chapter immediately, store the next chapter info
+          setNextChapter({
+            title: response.nextChapterTitle || response.nextChapter?.title || `Chapter ${prev.chapters.length + 1}`,
+            pendingPlayerIndex: response.nextPlayerIndex
+          });
+          
+          // Add new segment to current display
+          storyToShow = [...prev.storyProgress, chapterManager.deepCloneWithNewRefs(newStory)];
+          
+          // Add segment to current chapter
+          const result = chapterManager.addSegmentToChapter(updatedChapters, newStory, prev.currentChapterIndex);
+          updatedChapters = result.chapters;
+          
+          return {
+            ...prev,
+            storyProgress: storyToShow,
+            chapters: updatedChapters,
+            roundsInCurrentChapter: response.roundsInChapter || 0,
+            readyForNewChapter: true  // Flag indicating we're ready for new chapter
+          };
+        } else {
+          // Regular flow for mid-chapter actions
+          // Add segment to current chapter
+          const result = chapterManager.addSegmentToChapter(updatedChapters, newStory, prev.currentChapterIndex);
+          updatedChapters = result.chapters;
+          
+          // Add new segment to current display
+          storyToShow = [...prev.storyProgress, chapterManager.deepCloneWithNewRefs(newStory)];
+          
+          return {
+            ...prev,
+            storyProgress: storyToShow,
+            currentPlayerIndex: response.nextPlayerIndex,
+            chapters: updatedChapters,
+            currentChapterIndex: nextChapterIndex,
+            roundsInCurrentChapter: response.roundsInChapter || 0
+          };
+        }
       });
       
       setCurrentAction(null);
@@ -341,280 +311,163 @@ const HighlightedText = ({ text, activeTTS, isPlaying }) => {
     }
   };
   
-  // Render Setup Screen
-  const renderSetupScreen = () => (
-    <div className="setup-screen">
-      <h1>D&D AI Adventure</h1>
-      <div className="setup-form">
-        <div className="setup-section">
-          <h2>Game Settings</h2>
-          
-          <div className="form-group">
-            <label>Number of Players:</label>
-            <select 
-              value={gameState.settings.playerCount}
-              onChange={(e) => handleSettingsChange('playerCount', parseInt(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5, 6].map(num => (
-                <option key={num} value={num}>{num}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="form-group">
-            <label>AI Model:</label>
-            <select 
-              value={gameState.settings.aiModel}
-              onChange={(e) => handleSettingsChange('aiModel', e.target.value)}
-            >
-              {availableModels.map(model => (
-                <option key={model} value={model}>{model}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="features-group">
-            <div className="feature-toggle">
-              <input 
-                type="checkbox" 
-                id="enableImages" 
-                checked={gameState.settings.enableImages}
-                onChange={(e) => handleSettingsChange('enableImages', e.target.checked)}
-              />
-              <label htmlFor="enableImages">Enable Image Generation</label>
-            </div>
-            
-            <div className="feature-toggle">
-              <input 
-                type="checkbox" 
-                id="enableTTS" 
-                checked={gameState.settings.enableTTS}
-                onChange={(e) => handleSettingsChange('enableTTS', e.target.checked)}
-              />
-              <label htmlFor="enableTTS">Enable Text-to-Speech Narration</label>
-            </div>
-            
-            <div className="feature-toggle">
-              <input 
-                type="checkbox" 
-                id="enableMusic" 
-                checked={gameState.settings.enableMusic}
-                onChange={(e) => handleSettingsChange('enableMusic', e.target.checked)}
-              />
-              <label htmlFor="enableMusic">Enable Background Music</label>
-            </div>
-          </div>
-        </div>
-      </div>
+  // New function to handle starting the next chapter
+  const handleStartNewChapter = async () => {
+    if (loading || !nextChapter) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Starting new chapter with title:", nextChapter.title);
       
-      <div className="actions">
-        <button 
-          className="main-button" 
-          onClick={handleStartSetup}
-          disabled={loading}
-        >
-          {loading ? 'Loading...' : 'Continue to Character Creation'}
-        </button>
-      </div>
+      // Generate the first segment of the new chapter
+      const newChapterResponse = await api.startNewChapter(
+        // Pass a simplified gameState to avoid circular references
+        {
+          settings: gameState.settings,
+          characters: gameState.characters.map(c => ({
+            name: c.name,
+            race: c.race,
+            characterClass: c.characterClass,
+            gender: c.gender,
+            icon: null // Don't send huge base64 strings
+          })),
+          currentPlayerIndex: nextChapter.pendingPlayerIndex
+        },
+        nextChapter.title
+      );
       
-      {error && <div className="error-message">{error}</div>}
-    </div>
-  );
-  
-  // Render Character Creation Screen
-  const renderCharacterScreen = () => (
-    <div className="character-screen">
-      <h1>Character Creation</h1>
-      
-      <div className="character-form">
-        {gameState.characters.map((character, index) => (
-          <div key={index} className="character-card">
-            <h3>Player {index + 1}</h3>
-            
-            <div className="form-group">
-              <label>Character Name:</label>
-              <input 
-                type="text" 
-                value={character.name || ''}
-                onChange={(e) => handleCharacterChange(index, 'name', e.target.value)}
-                placeholder="Enter name"
-              />
-            </div>
-            
-            <div className="form-group">
-              <label>Race:</label>
-              <select 
-                value={character.race || ''}
-                onChange={(e) => handleCharacterChange(index, 'race', e.target.value)}
-              >
-                <option value="">Select Race</option>
-                {characterOptions?.races?.map(race => (
-                  <option key={race} value={race}>{race}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label>Class:</label>
-              <select 
-                value={character.characterClass || ''}
-                onChange={(e) => handleCharacterChange(index, 'characterClass', e.target.value)}
-              >
-                <option value="">Select Class</option>
-                {characterOptions?.classes?.map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Gender:</label>
-              <select
-                value={character.gender || ''}
-                onChange={(e) => handleCharacterChange(index, 'gender', e.target.value)}
-              >
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      <div className="actions">
-        <button 
-          className="secondary-button" 
-          onClick={() => setScreen('setup')}
-          disabled={loading}
-        >
-          Back
-        </button>
-        <button 
-          className="main-button" 
-          onClick={handleStartGame}
-          disabled={loading || !areCharactersComplete()}
-        >
-          {loading ? 'Creating Adventure...' : 'Start Adventure!'}
-        </button>
-      </div>
-      
-      {error && <div className="error-message">{error}</div>}
-      {!areCharactersComplete() && (
-        <div className="info-message">All characters must have a name, race, and class.</div>
-      )}
-    </div>
-  );
-  
-  // Render Main Game Screen
-  const renderGameScreen = () => (
-    <div className="game-screen">
-      <div className="game-layout">
-        <div className="story-container" ref={storyRef}>
-          {gameState.storyProgress.map((segment, index) => (
-            <div key={index} className="story-segment">
-              <div className="story-text">
-                {segment.player && segment.action && (
-                  <div className="player-action">
-                    <div className="player-icon">
-                      {gameState.characters.find(c => c.name === segment.player)?.icon ? (
-                        <img 
-                          src={`data:image/png;base64,${gameState.characters.find(c => c.name === segment.player)?.icon}`} 
-                          alt={segment.player} 
-                        />
-                      ) : (
-                        <div className="icon-placeholder">{segment.player[0]}</div>
-                      )}
-                    </div>
-                    <p><strong>{segment.player}</strong> chose to {segment.action}</p>
-                  </div>
-                )}
-                
-                <HighlightedText 
-                    text={segment.text} 
-                    activeTTS={activeTTS} 
-                    isPlaying={activeTTS === index} 
-                />
-                
-                {/* TTS Button with speaker icons */}
-                {gameState.settings.enableTTS && segment.text && (
-                  <button 
-                    className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
-                    onClick={() => toggleTTS(index)}
-                    title={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                    aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                  >
-                    {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
-                  </button>
-                )}
-              </div>
-              {segment.image && (
-                <div className="story-image">
-                  <img src={`data:image/png;base64,${segment.image}`} alt="Scene" />
-                </div>
-              )}
-            </div>
-          ))}
-          {/* End of story segments mapping */}
-        </div>
+      setGameState(prev => {
+        // Create new chapter object with proper title from nextChapter
+        const newChapter = {
+          id: prev.chapters.length,
+          title: nextChapter.title, // Ensure title is properly set
+          summary: "",
+          segments: [0],
+          storedSegments: { 
+            0: {
+              ...newChapterResponse.storyUpdate,
+              _id: `segment-${Date.now()}-${Math.random()}`,
+              timestamp: Date.now(),
+              chapterId: prev.chapters.length
+            } 
+          }
+        };
         
-        <div className="action-panel">
-          <div className="current-player">
-            {gameState.characters[gameState.currentPlayerIndex] && (
-              <>
-                <h3>Current Player: 
-                  <span className="player-name">{gameState.characters[gameState.currentPlayerIndex].name}</span>
-                </h3>
-                <div className="player-info">
-                  {gameState.characters[gameState.currentPlayerIndex].icon ? (
-                    <img 
-                      src={`data:image/png;base64,${gameState.characters[gameState.currentPlayerIndex].icon}`} 
-                      alt={gameState.characters[gameState.currentPlayerIndex].name} 
-                      className="active-player-icon"
-                    />
-                  ) : (
-                    <div className="icon-placeholder active">
-                      {gameState.characters[gameState.currentPlayerIndex].name[0]}
-                    </div>
-                  )}
-                  <div className="player-details">
-                    <p>{gameState.characters[gameState.currentPlayerIndex].race} {gameState.characters[gameState.currentPlayerIndex].characterClass}</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          
-          <div className="action-choices">
-            <h3>Choose Your Action:</h3>
-            
-            {gameState.storyProgress.length > 0 && 
-             gameState.storyProgress[gameState.storyProgress.length - 1].choices && 
-             gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
-              <button 
-                key={choice.id} 
-                className={`action-button ${currentAction === choice.id ? 'selected' : ''}`}
-                onClick={() => handleActionChoice(choice.id)}
-                disabled={loading}
-              >
-                {choice.text}
-              </button>
-            ))}
-            
-            {loading && <div className="loading-message">Generating story...</div>}
-          </div>
-        </div>
-      </div>
+        // Add the new chapter to the chapters array
+        const updatedChapters = [...prev.chapters, newChapter];
+        const nextChapterIndex = updatedChapters.length - 1;
+        
+        // Create new story progress with just the new segment
+        const newStoryProgress = [chapterManager.deepCloneWithNewRefs(newChapter.storedSegments[0])];
+        
+        // Update viewing chapter index too
+        setViewingChapterIndex(nextChapterIndex);
+        
+        return {
+          ...prev,
+          storyProgress: newStoryProgress,
+          currentPlayerIndex: nextChapter.pendingPlayerIndex,
+          chapters: updatedChapters,
+          currentChapterIndex: nextChapterIndex,
+          roundsInCurrentChapter: 0,
+          readyForNewChapter: false
+        };
+      });
       
-      {error && <div className="error-message">{error}</div>}
-    </div>
-  );
+      // Clear next chapter info
+      setNextChapter(null);
+      
+    } catch (err) {
+      setError('Failed to start new chapter. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Function to switch to a specific chapter view - completely rewritten
+  const handleViewChapter = (chapterIndex) => {
+    // Don't allow chapter changes while loading
+    if (loading) return;
+    
+    setViewingChapterIndex(chapterIndex);
+    
+    setGameState(prev => {
+      if (!prev.chapters || chapterIndex < 0 || chapterIndex >= prev.chapters.length) {
+        return prev;
+      }
+      
+      const targetChapter = prev.chapters[chapterIndex];
+      
+      // Completely rebuild the story progress for viewing this chapter
+      let newStoryProgress;
+      
+      if (chapterIndex < prev.currentChapterIndex) {
+        // Past chapter - show summary
+        newStoryProgress = [{
+          text: targetChapter.summary || "No summary available for this chapter.",
+          image: targetChapter.image,
+          chapterId: chapterIndex,
+          isChapterSummary: true,
+          _id: `summary-${chapterIndex}-${Date.now()}`
+        }];
+      } else {
+        // Current chapter - rebuild from stored segments
+        newStoryProgress = (targetChapter.segments || []).map(segIdx => {
+          if (targetChapter.storedSegments && targetChapter.storedSegments[segIdx]) {
+            return chapterManager.deepCloneWithNewRefs(targetChapter.storedSegments[segIdx]);
+          }
+          return null;
+        }).filter(Boolean);
+      }
+      
+      return {
+        ...prev,
+        // Replace storyProgress with completely fresh objects
+        storyProgress: newStoryProgress
+      };
+    });
+  };
   
   return (
-    <div className="dnd-app">
-      {screen === 'setup' && renderSetupScreen()}
-      {screen === 'character' && renderCharacterScreen()}
-      {screen === 'game' && renderGameScreen()}
+    <div className={`dnd-app ${screen === 'game' ? 'dnd-app-fullscreen' : ''}`}>
+      {screen === 'setup' && <SetupScreen 
+        gameState={gameState} 
+        setGameState={setGameState} 
+        availableModels={availableModels} 
+        handleStartSetup={handleStartSetup} 
+        loading={loading} 
+        error={error} 
+        setScreen={setScreen} 
+      />}
+      {screen === 'character' && <CharacterScreen 
+        gameState={gameState} 
+        setGameState={setGameState} 
+        characterOptions={characterOptions} 
+        handleCharacterChange={handleCharacterChange} 
+        handleStartGame={handleStartGame} 
+        loading={loading} 
+        error={error} 
+        areCharactersComplete={areCharactersComplete} 
+        setScreen={setScreen} 
+      />}
+      {screen === 'game' && <GameScreen 
+        gameState={gameState} 
+        setGameState={setGameState} 
+        handleActionChoice={handleActionChoice} 
+        handleViewChapter={handleViewChapter}
+        handleStartNewChapter={handleStartNewChapter} // Pass the new function
+        nextChapter={nextChapter} // Pass next chapter info
+        viewingChapterIndex={viewingChapterIndex}
+        loading={loading} 
+        error={error} 
+        currentAction={currentAction} 
+        activeTTS={activeTTS} 
+        toggleTTS={handleToggleTTS} 
+        storyRef={storyRef} 
+      />}
       
       {/* Background music player (hidden) */}
       {gameState.musicUrl && gameState.settings.enableMusic && (
