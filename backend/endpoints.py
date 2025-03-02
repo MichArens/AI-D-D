@@ -1,13 +1,29 @@
 from fastapi import HTTPException, BackgroundTasks
 from models import GameState, ActionRequest, CharacterIconRequest, Chapter, NewChapterRequest
-from ai_services import generate_text, generate_image, generate_music
+from ai_services import generate_text, generate_image, generate_music, generate_tts
 import random
 import logging
 import traceback
+from pydantic import BaseModel
+import asyncio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Helper function to generate TTS if enabled
+async def maybe_generate_tts(text, enable_tts=False):
+    """Generate TTS for text if enabled"""
+    if not enable_tts or not text:
+        return None
+    
+    try:
+        logger.info(f"Pre-generating TTS for text of length {len(text)}")
+        audio_data = await generate_tts(text, "af_heart")
+        return audio_data
+    except Exception as e:
+        logger.error(f"Failed to generate TTS: {e}")
+        return None
 
 # Fix the character options endpoint with better error handling
 async def generate_character_options():
@@ -62,6 +78,7 @@ async def generate_character_icon(request: CharacterIconRequest):
 async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     """Initialize the game with the first story segment and action choices"""
     model = game_state.settings.aiModel
+    enable_tts = game_state.settings.enableAITTS
     
     # Create character description for prompt
     character_descriptions = []
@@ -142,18 +159,22 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
         if game_state.settings.enableImages:
             image_base64 = await generate_image(story_part[:200])  # Use first part of story as prompt
         
+        # Pre-generate TTS for the story if enabled
+        audio_data = await maybe_generate_tts(story_part, enable_tts)
+        
         # Generate background music if enabled
         music_url = None
         if game_state.settings.enableMusic:
             background_tasks.add_task(generate_music, story_part[:100])
         
-        # Update the story progress
+        # Update the story progress with audio data
         initial_story = {
             "text": story_part,
             "image": image_base64,
             "player": None,
             "action": None,
-            "chapterId": 0
+            "chapterId": 0,
+            "audioData": audio_data  # Include pre-generated TTS
         }
         
         # Update first chapter with segment index
@@ -175,6 +196,7 @@ async def take_action(request: ActionRequest):
     game_state = request.gameState
     choice_id = request.choiceId
     model = game_state.settings.aiModel
+    enable_tts = game_state.settings.enableAITTS
     
     # Get the current player and their chosen action
     current_player_idx = game_state.currentPlayerIndex
@@ -388,14 +410,18 @@ async def take_action(request: ActionRequest):
         if game_state.settings.enableImages:
             image_base64 = await generate_image(story_part[:200])
         
-        # Create the story update
+        # Pre-generate TTS for story conclusion
+        audio_data = await maybe_generate_tts(story_part, enable_tts)
+        
+        # Create the story update with audio data
         next_chapter_id = current_chapter_idx + 1 if end_chapter else current_chapter_idx
         story_update = {
             "text": story_part,
             "image": image_base64,
             "player": current_player.name,
             "action": chosen_action,
-            "chapterId": next_chapter_id
+            "chapterId": next_chapter_id,
+            "audioData": audio_data  # Include pre-generated TTS
         }
         
         # Return different response structures based on whether chapter ended
@@ -454,9 +480,9 @@ async def start_new_chapter(request: NewChapterRequest):
         game_state = request.gameState
         next_chapter_title = request.nextChapterTitle
         
-        # Safely get model from game state
+        # Safely get model and TTS settings
         model = game_state.get('settings', {}).get('aiModel', 'llama3')
-        logger.info(f"Using AI model: {model}")
+        enable_tts = game_state.get('settings', {}).get('enableAITTS', False)
         
         # Get the first player index
         first_player_idx = game_state.get('currentPlayerIndex', 0)
@@ -529,6 +555,9 @@ async def start_new_chapter(request: NewChapterRequest):
                 {"id": 2, "text": "Search for something useful"}
             ]
         
+        # Pre-generate TTS for the story
+        audio_data = await maybe_generate_tts(story_part, enable_tts)
+        
         # Generate image if enabled
         image_base64 = None
         enable_images = game_state.get('settings', {}).get('enableImages', False)
@@ -541,7 +570,8 @@ async def start_new_chapter(request: NewChapterRequest):
             "storyUpdate": {
                 "text": story_part,
                 "image": image_base64,
-                "choices": actions
+                "choices": actions,
+                "audioData": audio_data  # Include pre-generated TTS
             },
             "choices": actions
         }
@@ -550,3 +580,19 @@ async def start_new_chapter(request: NewChapterRequest):
         logger.error(f"Error in start_new_chapter: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to start new chapter: {str(e)}")
+
+# Model for TTS request - keep standalone TTS endpoint for fallback
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "af_heart"  # Default voice
+
+async def generate_tts_endpoint(request: TTSRequest):
+    """Generate text-to-speech audio"""
+    try:
+        logger.info(f"Generating TTS for text of length: {len(request.text)}")
+        audio_data = await generate_tts(request.text, "af_heart")
+        return {"audioData": audio_data}
+    except Exception as e:
+        logger.error(f"Error generating TTS: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to generate TTS: {str(e)}")

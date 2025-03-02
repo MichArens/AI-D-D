@@ -205,6 +205,14 @@ button:disabled {
   height: 20px;
 }
 
+.feature-description {
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-left: 30px;
+  color: #d4af37;
+  margin-top: 3px;
+}
+
 .actions {
   display: flex;
   justify-content: center;
@@ -543,6 +551,27 @@ button:disabled {
     background-color: #c9302c;
   }
 
+  /* Improved highlighting style */
+  .highlighted-word {
+    position: relative;
+    background-color: rgba(255, 215, 0, 0.3); /* Semi-transparent gold */
+    border-radius: 3px;
+    padding: 2px 0;
+  }
+  
+  .highlighted-word::after {
+    content: "";
+    position: absolute;
+    left: -2px;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(255, 215, 0, 0.5); /* Slightly more opaque gold */
+    z-index: -1;
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.7); /* Add glow effect */
+  }
+
   .highlighted-word {
     position: relative;
   }
@@ -558,6 +587,28 @@ button:disabled {
     z-index: -1;
     border-radius: 3px;
   }
+
+/* Fix highlighted word/sentence styling for multi-line sentences */
+.highlighted-word {
+  position: relative;
+  display: inline; /* Changed from block */
+  background-color: rgba(255, 215, 0, 0.2); /* More subtle gold */
+  padding: 0;
+  border-radius: 2px;
+  box-decoration-break: clone; /* Important for multi-line highlights */
+  -webkit-box-decoration-break: clone;
+}
+
+/* Remove the ::after pseudo-element which causes issues with multi-line text */
+.highlighted-word::after {
+  display: none;
+}
+
+/* Create a simpler highlighting effect that works with multi-line text */
+.story-text .highlighted-word {
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.5); /* Outline glow instead of background */
+  background-color: rgba(255, 215, 0, 0.15); /* Very subtle background */
+}
 
 /* Main Chapter Header */
 .main-chapter-header {

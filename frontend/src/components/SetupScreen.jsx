@@ -70,11 +70,14 @@ const SetupScreen = ({
             <div className="feature-toggle">
               <input 
                 type="checkbox" 
-                id="enableTTS" 
-                checked={gameState.settings?.enableTTS !== false} 
-                onChange={(e) => handleSettingsChange('enableTTS', e.target.checked)}
+                id="enableAITTS" 
+                checked={gameState.settings?.enableAITTS !== false} 
+                onChange={(e) => handleSettingsChange('enableAITTS', e.target.checked)}
               />
-              <label htmlFor="enableTTS">Text-to-Speech Narration</label>
+              <label htmlFor="enableAITTS">AI-powered Text-to-Speech Narration</label>
+              <div className="feature-description">
+                (When disabled, browser's native speech synthesis will be used)
+              </div>
             </div>
             
             <div className="feature-toggle">

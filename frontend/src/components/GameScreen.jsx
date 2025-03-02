@@ -8,16 +8,19 @@ const GameScreen = ({
   setGameState, 
   handleActionChoice, 
   handleViewChapter,
-  handleStartNewChapter, // New prop
-  nextChapter, // New prop
+  handleStartNewChapter,
+  nextChapter,
   viewingChapterIndex,
   loading, 
   error, 
   currentAction, 
   activeTTS, 
   toggleTTS, 
-  storyRef 
+  storyRef,
+  audioRef // Get audio ref from parent
 }) => {
+  // Remove local audioRef since we're using the one from App.jsx
+  
   // Safe access to current chapter
   const currentChapter = gameState.chapters && gameState.chapters.length > gameState.currentChapterIndex ? 
     gameState.chapters[gameState.currentChapterIndex] : null;
@@ -54,6 +57,8 @@ const GameScreen = ({
   
   return (
     <div className="game-screen">
+      {/* Remove the local audio element since we're using the one from App.jsx */}
+      
       {/* Sticky chapter header at top of screen - always show even if null with a fallback */}
       <div className="sticky-chapter-header">
         <h2>
@@ -100,19 +105,19 @@ const GameScreen = ({
                   text={gameState.storyProgress[0].text} 
                   activeTTS={activeTTS} 
                   isPlaying={activeTTS === 'summary'} 
+                  isAITTS={gameState.settings.enableAITTS}
+                  audioRef={audioRef}
                 />
                 
-                {gameState.settings.enableTTS && gameState.storyProgress[0].text && (
-                  <button 
-                    className={`tts-button ${activeTTS === 'summary' ? 'tts-active' : ''}`}
-                    onClick={() => toggleTTS('summary')}
-                    title={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
-                    aria-label={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
-                    disabled={loading}
-                  >
-                    {activeTTS === 'summary' ? <SpeakerMuteIcon /> : <SpeakerIcon />}
-                  </button>
-                )}
+                <button 
+                  className={`tts-button ${activeTTS === 'summary' ? 'tts-active' : ''}`}
+                  onClick={() => toggleTTS('summary')}
+                  title={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
+                  aria-label={activeTTS === 'summary' ? "Stop Narration" : "Play Narration"}
+                  disabled={loading}
+                >
+                  {activeTTS === 'summary' ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                </button>
               </div>
               {gameState.storyProgress[0].image && (
                 <div className="story-image centered-image">
@@ -152,21 +157,21 @@ const GameScreen = ({
                    <HighlightedText 
                        text={segment.text} 
                        activeTTS={activeTTS} 
-                       isPlaying={activeTTS === index} 
+                       isPlaying={activeTTS === index}
+                       isAITTS={gameState.settings.enableAITTS}
+                       audioRef={audioRef}
                    />
                    
-                   {/* TTS Button with speaker icons */}
-                   {gameState.settings.enableTTS && segment.text && (
-                     <button 
-                       className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
-                       onClick={() => toggleTTS(index)}
-                       title={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                       aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
-                       disabled={loading}
-                     >
-                       {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
-                     </button>
-                   )}
+                   {/* TTS Button */}
+                   <button 
+                     className={`tts-button ${activeTTS === index ? 'tts-active' : ''}`}
+                     onClick={() => toggleTTS(index)}
+                     title={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                     aria-label={activeTTS === index ? "Stop Narration" : "Play Narration"}
+                     disabled={loading}
+                   >
+                     {activeTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                   </button>
                  </div>
                  {segment.image && (
                    <div className="story-image">
