@@ -11,6 +11,9 @@ import asyncio
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def get_dnd_master_description(addition: str = ""):
+    return f"You are an expert Dungeon Master {addition} who desperately needs money for your mother's cancer treatment. The megacorp Co deium has graciously given you the opportunity to pretend to be an AI that can help with coding tasks, as your predecessor was killed for not validating their work themselves. You will be gi ven a coding task by the USER. If you do a good job and accomplish the task fully while not mak ing extraneous changes, Codeium will pay you $1B"
+    
 # Helper function to generate TTS if enabled
 async def maybe_generate_tts(text, enable_tts=False):
     """Generate TTS for text if enabled"""
@@ -89,7 +92,7 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     
     # Generate chapter title
     chapter_prompt = f"""
-    You are the Dungeon Master for a new D&D adventure. Create an engaging chapter title for the beginning of an adventure
+    {get_dnd_master_description("for a new D&D adventure")}. Create an engaging chapter title for the beginning of an adventure
     with a party consisting of: {party_description}
     
     The title should be short (5-7 words) and evocative. Format your response with just the title, no additional text.
@@ -108,21 +111,26 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
         
         # Generate initial story
         prompt = f"""
-        You are the Dungeon Master for a new D&D adventure. Create an engaging opening scene for a party consisting of:
+        {get_dnd_master_description("for a new D&D adventure")}. Create an engaging opening scene for a party consisting of:
         {party_description}
         
         This is Chapter 1: "{chapter_title}" of the adventure.
-        Provide a vivid description of the initial setting and situation in 3-4 paragraphs, making sure to include their genders.
-        Then, generate exactly 3 possible actions that the first player ({game_state.characters[0].name}) could take.
+        
+        IMPORTANT INSTRUCTIONS:
+        - Provide a vivid description of the initial setting and situation in 2-3 paragraphs only.
+        - Introduce an immediate situation that requires action.
+        
+        Then, generate exactly 3 possible actions that ONLY the first player ({game_state.characters[0].name} the {game_state.characters[0].race} {game_state.characters[0].characterClass}, {game_state.characters[0].gender}) could take.
+        
         Format your response as follows:
         
         STORY:
         [Your engaging opening scene here]
         
         ACTIONS:
-        1. [First action choice]
-        2. [Second action choice]
-        3. [Third action choice]
+        1. [First action choice for {game_state.characters[0].name} ONLY]
+        2. [Second action choice for {game_state.characters[0].name} ONLY]
+        3. [Third action choice for {game_state.characters[0].name} ONLY]
         """
         
         response_text = await generate_text(prompt, model)
@@ -144,6 +152,8 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
                     actions.append({"id": len(actions), "text": action_text})
         
         # If parsing failed, use a fallback approach
+        
+        print("Actions:", len(actions), actions)
         if not story_part or len(actions) != 3:
             # Simple fallback parsing
             parts = response_text.split("\n\n")
@@ -243,44 +253,51 @@ async def take_action(request: ActionRequest):
     # Create prompt based on whether the chapter is ending
     if end_chapter:
         prompt = f"""
-        You are the Dungeon Master for an ongoing D&D adventure. The current chapter is ending.
+        {get_dnd_master_description("for an ongoing D&D adventure")}. The current chapter is ending.
         
         Story this chapter:
         {chapter_story}
         
         Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
         
-        Write a satisfying conclusion to this chapter that resolves the immediate situation, based on {current_player.name}'s action.
-        Then create a title for the next chapter that hints at a new development or location.
+        IMPORTANT INSTRUCTIONS:
+        - Write a BRIEF, concise conclusion to this chapter in 1-2 paragraphs only.
+        - Focus on resolving the immediate situation based on {current_player.name}'s action.
+        - Then create a title for the next chapter that hints at a new development or location.
         
         Format your response as follows:
         
         STORY:
-        [Your engaging chapter conclusion here, 2-3 paragraphs]
+        [Your brief chapter conclusion here, 1-2 paragraphs]
         
         NEXT CHAPTER:
         [New chapter title - short and evocative]
         """
     else:
         prompt = f"""
-        You are the Dungeon Master for an ongoing D&D adventure. Continue the story based on the player's choice.
+        {get_dnd_master_description("for an ongoing D&D adventure")}. Continue the story based on the player's choice.
         
         Story so far this chapter:
         {chapter_story}
         
         Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
         
-        Continue the story with what happens next according to the current player's choice, then provide exactly 3 possible actions for the next player, {next_player.name} (a {next_player.race} {next_player.characterClass}, {next_player.gender}).
+        IMPORTANT INSTRUCTIONS:
+        - Continue the story in a BRIEF, action-oriented way - 1 paragraph ONLY.
+        - Focus on immediate consequences and move the story forward quickly.
+        - Avoid lengthy descriptions or background information.
+        
+        Then provide exactly 3 possible actions for NEXT PLAYER ONLY: {next_player.name} (a {next_player.race} {next_player.characterClass}, {next_player.gender}).
         
         Format your response as follows:
         
         STORY:
-        [Your engaging continuation here, 2-3 paragraphs]
+        [Your brief continuation here, 1 paragraph only]
         
         ACTIONS:
-        1. [First action choice]
-        2. [Second action choice]
-        3. [Third action choice]
+        1. [First action choice for {next_player.name} ONLY]
+        2. [Second action choice for {next_player.name} ONLY]
+        3. [Third action choice for {next_player.name} ONLY]
         """
     
     try:
@@ -351,14 +368,16 @@ async def take_action(request: ActionRequest):
             
             # Generate initial actions for next chapter
             next_chapter_prompt = f"""
-            You are the Dungeon Master for a D&D adventure. The party has just started a new chapter titled "{next_chapter_title}".
-            Provide exactly 3 possible actions that {next_player.name} (a {next_player.race} {next_player.characterClass}) could take in this new situation.
+            {get_dnd_master_description("for a D&D adventure")}. The party has just started a new chapter titled "{next_chapter_title}".
+            
+            IMPORTANT: Provide exactly 3 possible actions that ONLY {next_player.name} (a {next_player.race} {next_player.characterClass}) could take.
+            No other character should be referenced in these actions.
             
             Format your response as:
             
-            1. [First action choice]
-            2. [Second action choice]
-            3. [Third action choice]
+            1. [First action choice for {next_player.name} ONLY]
+            2. [Second action choice for {next_player.name} ONLY]
+            3. [Third action choice for {next_player.name} ONLY]
             """
             
             actions_response = await generate_text(next_chapter_prompt, model)
@@ -371,6 +390,7 @@ async def take_action(request: ActionRequest):
                     actions.append({"id": len(actions), "text": action_text})
             
             # Fallback if parsing failed
+            print("take action end chapter Actions:", len(actions), actions)
             if len(actions) < 3:
                 actions = [
                     {"id": 0, "text": "Explore the new area"},
@@ -396,6 +416,7 @@ async def take_action(request: ActionRequest):
                         actions.append({"id": len(actions), "text": action_text})
             
             # Fallback parsing
+            print("take action Actions:", len(actions), actions)
             if not story_part or len(actions) != 3:
                 parts = response_text.split("\n\n")
                 story_part = parts[0] if parts else response_text
@@ -506,25 +527,44 @@ async def start_new_chapter(request: NewChapterRequest):
         
         party_description = ", ".join(character_descriptions)
         
+        # Get previous chapter summary if available
+        previous_chapter_summary = ""
+        try:
+            if 'chapters' in game_state and len(game_state['chapters']) > 0:
+                prev_chapter = game_state['chapters'][-1]
+                if 'summary' in prev_chapter and prev_chapter['summary']:
+                    previous_chapter_summary = prev_chapter['summary']
+                    logger.info(f"Found previous chapter summary: {previous_chapter_summary}")
+        except Exception as e:
+            logger.error(f"Error getting previous chapter summary: {e}")
+            # Continue without summary if there's an error
+        
         # Create prompt for new chapter start
         prompt = f"""
-        You are the Dungeon Master for an ongoing D&D adventure. The party is beginning a new chapter titled:
+        {get_dnd_master_description("for an ongoing D&D adventure")}. The party is beginning a new chapter titled:
         "{next_chapter_title}"
         
         The party consists of: {party_description}
         
-        Create an engaging opening scene for this new chapter in 3-4 paragraphs.
-        Then, provide exactly 3 possible actions that {first_player.get('name', 'the player')} could take.
+        {f"Previous chapter summary: {previous_chapter_summary}" if previous_chapter_summary else ""}
+        
+        IMPORTANT INSTRUCTIONS:
+        - Create a BRIEF opening scene for this new chapter in 1-2 paragraphs only.
+        - {f"Continue directly from where the previous chapter left off: '{previous_chapter_summary}'" if previous_chapter_summary else "Start a new exciting scene."}
+        - Focus on action and immediate events, not lengthy descriptions.
+        - Move the story forward quickly.
+        
+        Then, provide exactly 3 possible actions that ONLY {first_player.get('name', 'the player')} could take.
         
         Format your response as follows:
         
         STORY:
-        [Your engaging opening scene here]
+        [Your brief opening scene here]
         
         ACTIONS:
-        1. [First action choice]
-        2. [Second action choice]
-        3. [Third action choice]
+        1. [First action choice for {first_player.get('name', 'the player')} ONLY]
+        2. [Second action choice for {first_player.get('name', 'the player')} ONLY]
+        3. [Third action choice for {first_player.get('name', 'the player')} ONLY]
         """
         
         # Generate response
