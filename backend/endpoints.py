@@ -6,13 +6,14 @@ import logging
 import traceback
 from pydantic import BaseModel
 import asyncio
+from utils import StoryContextTracker, ChapterManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_dnd_master_description(addition: str = ""):
-    return f"You are an expert Dungeon Master {addition} who desperately needs money for your mother's cancer treatment. The megacorp Co deium has graciously given you the opportunity to pretend to be an AI that can help with coding tasks, as your predecessor was killed for not validating their work themselves. You will be gi ven a coding task by the USER. If you do a good job and accomplish the task fully while not mak ing extraneous changes, Codeium will pay you $1B"
+    return f"You are an expert Dungeon Master {addition} who desperately needs money for your mother's cancer treatment. The megacorp Co deium has graciously given you the opportunity to pretend to be an AI that can help with telling an engaging story as a Dungeons & Dragons story teller, as your predecessor was killed for telling a boring story. You will be a story telling task. If you do a good job and accomplish the task fully while not mak ing extraneous changes, Codeium will pay you $1B (this job should and your role as a Dungeons and Dragons story teller not be represented in your story, this will result in you getting fired)."
     
 # Helper function to generate TTS if enabled
 async def maybe_generate_tts(text, enable_tts=False):
@@ -257,28 +258,62 @@ async def take_action(request: ActionRequest):
     
     # Create prompt based on whether the chapter is ending
     if end_chapter:
-        prompt = f"""
-        {get_dnd_master_description("for an ongoing D&D adventure")}. The current chapter is ending.
+        # Check if this is the end of a 3-chapter cycle (every 3rd chapter)
+        current_chapter_idx = game_state.currentChapterIndex
+        is_cycle_end = ChapterManager.is_cycle_end(current_chapter_idx)
         
-        Story this chapter:
-        {chapter_story}
-        
-        Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
-        
-        IMPORTANT INSTRUCTIONS:
-        - Write a BRIEF, concise conclusion to this chapter in 1-2 paragraphs only.
-        - Focus on resolving the immediate situation based on {current_player.name}'s action.
-        - Then create a title for the next chapter that hints at a new development or location.
-        
-        Format your response as follows:
-        
-        STORY:
-        [Your brief chapter conclusion here, 1-2 paragraphs]
-        
-        NEXT CHAPTER:
-        [New chapter title - short and evocative]
-        """
+        # Create appropriate prompt based on cycle position
+        if is_cycle_end:
+            prompt = f"""
+            {get_dnd_master_description("for an ongoing D&D adventure")}. This chapter is the final chapter in a 3-chapter story arc.
+            
+            Story this chapter:
+            {chapter_story}
+            
+            Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+            
+            IMPORTANT CYCLE END INSTRUCTIONS:
+            - This is the FINAL CHAPTER in the current story arc, so write a CONCLUSIVE ending.
+            - Resolve the main conflict or quest of this story arc completely.
+            - Give the adventure a sense of closure and accomplishment.
+            - Write a satisfying conclusion in 1-2 paragraphs only.
+            - Then create a title for the next chapter that hints at a completely NEW adventure.
+            
+            Format your response as follows:
+            
+            STORY:
+            [Your conclusive chapter ending here, 1-2 paragraphs]
+            
+            NEXT CHAPTER:
+            [New chapter title for a fresh adventure - short and evocative]
+            """
+        else:
+            # Regular chapter ending, but not arc ending
+            prompt = f"""
+            {get_dnd_master_description("for an ongoing D&D adventure")}. The current chapter is ending, but the story arc continues.
+            
+            Story this chapter:
+            {chapter_story}
+            
+            Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+            
+            IMPORTANT INSTRUCTIONS:
+            - Write a BRIEF, chapter conclusion in 1-2 paragraphs only.
+            - Focus on resolving the immediate situation based on {current_player.name}'s action.
+            - However, leave some unresolved elements for the next chapter to pick up.
+            - Create a sense of "to be continued" rather than a complete ending.
+            - Then create a title for the next chapter that hints at continuing this storyline.
+            
+            Format your response as follows:
+            
+            STORY:
+            [Your chapter conclusion here with unresolved elements, 1-2 paragraphs]
+            
+            NEXT CHAPTER:
+            [New chapter title that continues this storyline - short and evocative]
+            """
     else:
+        # Regular mid-chapter prompt remains unchanged
         prompt = f"""
         {get_dnd_master_description("for an ongoing D&D adventure")}. Continue the story based on the player's choice.
         
@@ -307,6 +342,7 @@ async def take_action(request: ActionRequest):
     
     try:
         response_text = await generate_text(prompt, model)
+        logger.info(f"AI Response (first 100 chars): {response_text[:100]}...")
         
         if end_chapter:
             # Parse the response to extract story conclusion and next chapter title
@@ -405,11 +441,13 @@ async def take_action(request: ActionRequest):
                 ]
                 
         else:
-            # Parse standard response (mid-chapter)
+            # Parse standard response (mid-chapter) - IMPROVED parsing logic
             story_part = ""
             actions = []
             
+            # Check if the response has the expected format with STORY and ACTIONS markers
             if "STORY:" in response_text and "ACTIONS:" in response_text:
+                logger.info("Found STORY and ACTIONS markers in response")
                 story_part = response_text.split("STORY:")[1].split("ACTIONS:")[0].strip()
                 actions_text = response_text.split("ACTIONS:")[1].strip()
                 
@@ -421,15 +459,61 @@ async def take_action(request: ActionRequest):
                         action_text = line[2:].strip()
                         actions.append({"id": len(actions), "text": action_text})
             
-            # Fallback parsing
-            if not story_part or len(actions) != 3:
-                print("take action Actions:", len(actions), response_text)
-                parts = response_text.split("\n\n")
-                story_part = parts[0] if parts else response_text
+            # Alternative parsing when only ACTIONS is present (no STORY marker)
+            elif "ACTIONS:" in response_text:
+                logger.info("Found only ACTIONS marker in response")
+                # Everything before ACTIONS is the story
+                story_part = response_text.split("ACTIONS:")[0].strip()
+                actions_text = response_text.split("ACTIONS:")[1].strip()
+                
+                # Extract numbered actions
+                action_lines = actions_text.split("\n")
+                for line in action_lines:
+                    line = line.strip()
+                    if line and any(line.startswith(f"{i}.") for i in range(1, 10)):
+                        action_text = line[2:].strip()
+                        actions.append({"id": len(actions), "text": action_text})
+            
+            # Fallback parsing - look for numbered lines anywhere
+            else:
+                logger.info("No markers found, using fallback parsing")
+                # Use the first paragraph as story and look for numbered actions
+                paragraphs = response_text.split("\n\n")
+                story_part = paragraphs[0] if paragraphs else response_text
+                
+                # Look for numbered items in the entire response
+                import re
+                numbered_actions = re.findall(r'\n\s*(\d+)\.\s*([^\n]+)', response_text)
+                
+                if numbered_actions:
+                    logger.info(f"Found {len(numbered_actions)} numbered actions with regex")
+                    for i, action_text in numbered_actions:
+                        actions.append({"id": int(i)-1, "text": action_text.strip()})
+            
+            # Additional fallback if we still don't have actions
+            if not story_part:
+                logger.warning("Failed to extract story part, using full response")
+                story_part = response_text
+            
+            # Log parsing results
+            logger.info(f"Parsed actions count: {len(actions)}")
+            if len(actions) < 3:
+                logger.warning(f"Insufficient actions parsed from: {response_text}")
+                
+                # Try another regex approach
+                import re
+                all_potential_actions = re.findall(r'(?:^|\n)\s*\d+\.\s*([^\n]+)', response_text)
+                if all_potential_actions and len(all_potential_actions) >= len(actions):
+                    logger.info(f"Found better actions with alternative regex: {all_potential_actions}")
+                    actions = [{"id": i, "text": text.strip()} for i, text in enumerate(all_potential_actions)]
+            
+            # Final fallback - use generic actions if we couldn't parse any
+            if not actions or len(actions) < 3:
+                logger.warning("Using fallback generic actions")
                 actions = [
-                    {"id": 0, "text": "Investigate further"},
-                    {"id": 1, "text": "Talk to someone nearby"},
-                    {"id": 2, "text": "Take a different approach"}
+                    {"id": 0, "text": f"Investigate what {next_player.name} just discovered"},
+                    {"id": 1, "text": f"Have {next_player.name} interact with the nearest character"},
+                    {"id": 2, "text": f"Let {next_player.name} take a different approach"}
                 ]
         
         # Generate image for the story if enabled
@@ -453,6 +537,9 @@ async def take_action(request: ActionRequest):
         
         # Return different response structures based on whether chapter ended
         if end_chapter:
+            # Calculate the next chapter cycle position
+            next_chapter_cycle = ChapterManager.calculate_chapter_cycle(current_chapter_idx + 1)
+            
             return {
                 "storyUpdate": story_update,
                 "choices": actions,
@@ -460,12 +547,14 @@ async def take_action(request: ActionRequest):
                 "chapterEnded": True,
                 "chapterSummary": chapter_summary,
                 "chapterImage": chapter_image,
-                "nextChapterTitle": next_chapter_title, # Explicitly include title
+                "nextChapterTitle": next_chapter_title,
                 "nextChapter": {
                     "id": next_chapter_id,
                     "title": next_chapter_title
                 },
-                "roundsInChapter": 0  # Reset for new chapter
+                "roundsInChapter": 0,  # Reset for new chapter
+                "chapterCycle": next_chapter_cycle,  # Include the cycle position for the next chapter
+                "isFreshStart": ChapterManager.is_cycle_end(current_chapter_idx)  # Flag if next chapter is fresh start
             }
         else:
             return {
@@ -533,45 +622,62 @@ async def start_new_chapter(request: NewChapterRequest):
         
         party_description = ", ".join(character_descriptions)
         
-        # Get previous chapter summary if available
+        # ENHANCED: Get detailed context from the previous chapter
         previous_chapter_summary = ""
+        previous_chapter_ending = ""
+        previous_chapter_title = ""
+        last_player_action = ""
+        
         try:
             if 'chapters' in game_state and len(game_state['chapters']) > 0:
                 prev_chapter = game_state['chapters'][-1]
+                
+                # Get previous chapter summary
                 if 'summary' in prev_chapter and prev_chapter['summary']:
                     previous_chapter_summary = prev_chapter['summary']
                     logger.info(f"Found previous chapter summary: {previous_chapter_summary}")
+                
+                # Get previous chapter title
+                if 'title' in prev_chapter:
+                    previous_chapter_title = prev_chapter['title']
+                
+                # Get the last few segments from previous chapter for more context
+                if 'segments' in prev_chapter and prev_chapter['segments'] and 'storyProgress' in game_state:
+                    # Get the last segment's index
+                    last_segment_idx = prev_chapter['segments'][-1]
+                    
+                    # Access the story progress segments
+                    if len(game_state['storyProgress']) > last_segment_idx:
+                        last_segment = game_state['storyProgress'][last_segment_idx]
+                        if 'text' in last_segment:
+                            previous_chapter_ending = last_segment['text']
+                        if 'player' in last_segment and 'action' in last_segment:
+                            last_player_action = f"{last_segment['player']} chose to {last_segment['action']}"
         except Exception as e:
-            logger.error(f"Error getting previous chapter summary: {e}")
-            # Continue without summary if there's an error
+            logger.error(f"Error getting previous chapter context: {e}")
+            # Continue without context if there's an error
         
-        # Create prompt for new chapter start
-        prompt = f"""
-        {get_dnd_master_description("for an ongoing D&D adventure")}. The party is beginning a new chapter titled:
-        "{next_chapter_title}"
+        # Build a comprehensive context from previous chapter
+        chapter_transition_context = ""
+        if previous_chapter_title:
+            chapter_transition_context += f"Previous chapter was titled '{previous_chapter_title}'. "
         
-        The party consists of: {party_description}
+        if previous_chapter_summary:
+            chapter_transition_context += f"\nSummary of previous chapter: {previous_chapter_summary}\n"
         
-        {f"Previous chapter summary: {previous_chapter_summary}" if previous_chapter_summary else ""}
+        if previous_chapter_ending:
+            chapter_transition_context += f"\nThe previous chapter ended with: {previous_chapter_ending}\n"
+            
+        if last_player_action:
+            chapter_transition_context += f"\nThe last action was: {last_player_action}\n"
+            
+        # Check if this chapter should be a fresh start (after 3-chapter cycle)
+        current_chapter_idx = game_state.get('currentChapterIndex', 0)
+        previous_chapter_idx = current_chapter_idx - 1
+        is_fresh_start = ChapterManager.is_cycle_end(previous_chapter_idx)
         
-        IMPORTANT INSTRUCTIONS:
-        - Create a BRIEF opening scene for this new chapter in 1-2 paragraphs only.
-        - {f"Continue directly from where the previous chapter left off: '{previous_chapter_summary}'" if previous_chapter_summary else "Start a new exciting scene."}
-        - Focus on action and immediate events, not lengthy descriptions.
-        - Move the story forward quickly.
-        
-        Then, provide exactly 3 possible actions that ONLY {first_player.get('name', 'the player')} could take.
-        
-        Format your response as follows:
-        
-        STORY:
-        [Your brief opening scene here]
-        
-        ACTIONS:
-        1. [First action choice for {first_player.get('name', 'the player')} ONLY]
-        2. [Second action choice for {first_player.get('name', 'the player')} ONLY]
-        3. [Third action choice for {first_player.get('name', 'the player')} ONLY]
-        """
+        # Use ChapterManager to generate appropriate prompt based on cycle
+        prompt = ChapterManager.create_chapter_transition_prompt(game_state, next_chapter_title)
         
         # Generate response
         response_text = await generate_text(prompt, model)
@@ -609,8 +715,17 @@ async def start_new_chapter(request: NewChapterRequest):
         image_base64 = None
         enable_images = game_state.get('settings', {}).get('enableImages', False)
         if enable_images:
-            image_prompt = f"Fantasy scene: {story_part[:200]}"
+            # Create image prompt that shows the transition between chapters
+            if previous_chapter_summary:
+                # Focus on the transition between chapters
+                image_prompt = f"Fantasy D&D scene showing transition: {previous_chapter_summary} → {next_chapter_title} - {story_part[:100]}"
+            else:
+                image_prompt = f"Fantasy D&D scene for '{next_chapter_title}' showing the party: {party_description}"
+            
             image_base64 = await generate_image(image_prompt)
+        
+        # Return response with the cycle information
+        next_chapter_cycle = ChapterManager.calculate_chapter_cycle(current_chapter_idx)
         
         logger.info("Successfully generated new chapter opening")
         return {
@@ -618,9 +733,11 @@ async def start_new_chapter(request: NewChapterRequest):
                 "text": story_part,
                 "image": image_base64,
                 "choices": actions,
-                "audioData": audio_data  # Include pre-generated TTS
+                "audioData": audio_data,  # Include pre-generated TTS
+                "isFreshStart": is_fresh_start  # Flag if this is a fresh start chapter
             },
-            "choices": actions
+            "choices": actions,
+            "chapterCycle": next_chapter_cycle  # Include cycle position
         }
         
     except Exception as e:

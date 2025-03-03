@@ -53,6 +53,7 @@ class GameState(BaseModel):
     chapters: List[Chapter] = []
     currentChapterIndex: int = 0
     roundsInCurrentChapter: int = 0
+    chapterCycle: int = 0  # Track which chapter in the cycle (0, 1, 2)
 
 class ActionChoice(BaseModel):
     id: int
