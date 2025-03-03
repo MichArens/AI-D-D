@@ -25,7 +25,7 @@ class CharacterClass(str, Enum):
 class GameSettings(BaseModel):
     playerCount: int
     enableImages: bool = False
-    enableTTS: bool = True
+    enableAITTS: bool = False  # Changed from enableTTS to enableAITTS
     enableMusic: bool = False
     aiModel: str = "llama3"
 

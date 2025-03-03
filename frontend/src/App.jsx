@@ -4,7 +4,6 @@ import SetupScreen from './components/SetupScreen';
 import CharacterScreen from './components/CharacterScreen';
 import GameScreen from './components/GameScreen';
 import { api } from './services/api';
-import { toggleTTS } from './utils/tts';
 // Conditionally import chapter manager to avoid errors if file doesn't exist
 const chapterManager = (() => {
   try {
@@ -30,7 +29,7 @@ function App() {
     settings: {
       playerCount: 2,
       enableImages: false,
-      enableTTS: true,
+      enableAITTS: false, // Changed from enableTTS to enableAITTS
       enableMusic: false,
       aiModel: 'llama3'
     },
@@ -41,9 +40,41 @@ function App() {
   });
   const [currentAction, setCurrentAction] = useState(null);
   const [activeTTS, setActiveTTS] = useState(null); // Track which story segment is being spoken
+  const [audioData, setAudioData] = useState(null); // For AI TTS audio data
+  const audioRef = useRef(null); // Reference to the audio element
   const storyRef = useRef(null);
   const [viewingChapterIndex, setViewingChapterIndex] = useState(0);
   const [nextChapter, setNextChapter] = useState(null);
+  
+  // Add error timeout ref to clear error messages
+  const errorTimeoutRef = useRef(null);
+  
+  // Clear error messages after a timeout
+  const clearErrorAfterDelay = (message = null) => {
+    // Clear any existing timeout
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+    }
+    
+    if (message) {
+      setError(message);
+      // Set a new timeout to clear the error
+      errorTimeoutRef.current = setTimeout(() => {
+        setError(null);
+      }, 3000); // Clear after 3 seconds
+    } else {
+      setError(null);
+    }
+  };
+  
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // Load available models on startup
   useEffect(() => {
@@ -87,10 +118,177 @@ function App() {
     }));
   };
   
-  // Text-to-speech toggle function
-  // Replace your existing toggleTTS function with this:
-  const handleToggleTTS = (index) => {
-    toggleTTS(index, activeTTS, setActiveTTS);
+  // Text-to-speech toggle function - updated to use pre-generated TTS
+  const handleToggleTTS = async (index) => {
+    // If already playing this segment, stop it
+    if (activeTTS === index) {
+      console.log("Stopping TTS for index:", index);
+      
+      // Don't show errors when manually stopping
+      const wasManuallyStopped = true;
+      
+      if (gameState.settings.enableAITTS && audioRef.current) {
+        try {
+          // More forceful stopping of AI TTS
+          audioRef.current.onended = null; // Remove event listeners first
+          audioRef.current.onerror = null;
+          audioRef.current.oncanplaythrough = null;
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          
+          // Use empty blob instead of empty string for better browser compatibility
+          try {
+            const emptyBlob = new Blob([""], { type: "audio/wav" });
+            audioRef.current.src = URL.createObjectURL(emptyBlob);
+          } catch (e) {
+            audioRef.current.src = "";
+          }
+        } catch (e) {
+          console.log("Normal cleanup during TTS stop:", e);
+          // Don't set error for normal cleanup
+        }
+      }
+      
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      
+      // Clear any error message that might be showing
+      if (wasManuallyStopped) {
+        clearErrorAfterDelay(null);
+      }
+      
+      setActiveTTS(null);
+      return;
+    }
+    
+    // If playing a different segment, stop that first
+    if (activeTTS !== null) {
+      if (gameState.settings.enableAITTS && audioRef.current) {
+        // Clean up current audio properly
+        try {
+          audioRef.current.onended = null;
+          audioRef.current.onerror = null;
+          audioRef.current.oncanplaythrough = null;
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          
+          // Use empty blob instead of empty string
+          const emptyBlob = new Blob([""], { type: "audio/wav" });
+          audioRef.current.src = URL.createObjectURL(emptyBlob);
+        } catch (e) {
+          console.log("Normal cleanup during TTS switch:", e);
+        }
+      }
+      
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      
+      setActiveTTS(null);
+    }
+    
+    // Get text content to speak
+    let textToSpeak = "";
+    let preGeneratedAudio = null;
+    
+    if (index === 'summary' && gameState.storyProgress.length > 0) {
+      textToSpeak = gameState.storyProgress[0].text;
+      preGeneratedAudio = gameState.storyProgress[0].audioData;
+    } else if (gameState.storyProgress && gameState.storyProgress[index]) {
+      textToSpeak = gameState.storyProgress[index].text;
+      preGeneratedAudio = gameState.storyProgress[index].audioData;
+    } else {
+      return; // No text to speak
+    }
+    
+    // Use AI TTS if enabled
+    if (gameState.settings.enableAITTS) {
+      try {
+        let audioData = preGeneratedAudio;
+        
+        // If no pre-generated audio, fetch it on-demand
+        if (!audioData) {
+          console.log("No pre-generated audio, fetching on demand");
+          setLoading(true);
+          try {
+            const response = await api.generateTTS(textToSpeak);
+            
+            if (!response || !response.audioData) {
+              throw new Error("No audio data received from server");
+            }
+            
+            audioData = response.audioData;
+          } finally {
+            setLoading(false);
+          }
+        } else {
+          console.log("Using pre-generated audio");
+        }
+        
+        // Save the audio data
+        setAudioData(audioData);
+        
+        // Play audio once it's loaded
+        if (audioRef.current && audioData) {
+          // Clear any previous audio and listeners
+          audioRef.current.oncanplaythrough = null;
+          audioRef.current.onended = null;
+          audioRef.current.onerror = null;
+          
+          // Set up new audio
+          audioRef.current.src = `data:audio/wav;base64,${audioData}`;
+          
+          // Set up event handlers
+          audioRef.current.oncanplaythrough = () => {
+            console.log("Audio ready to play");
+            audioRef.current.play().catch(e => {
+              console.error("Failed to play audio:", e);
+              setActiveTTS(null);
+              clearErrorAfterDelay("Failed to play audio. Check your browser settings.");
+            });
+          };
+          
+          audioRef.current.onended = () => {
+            console.log("Audio playback completed");
+            setActiveTTS(null);
+          };
+          
+          audioRef.current.onerror = (e) => {
+            // Only show errors if we didn't manually stop
+            if (activeTTS === index) {
+              console.error("Audio error:", e);
+              setActiveTTS(null);
+              clearErrorAfterDelay("Audio playback error. Try again.");
+            }
+          };
+        }
+        
+        // Mark this segment as active for TTS
+        setActiveTTS(index);
+      } catch (err) {
+        console.error("TTS generation failed:", err);
+        clearErrorAfterDelay("Failed to generate AI narration. Using browser TTS instead.");
+        
+        // Fallback to browser TTS
+        if (window.speechSynthesis) {
+          const utterance = new SpeechSynthesisUtterance(textToSpeak);
+          utterance.rate = 0.9;
+          utterance.onend = () => setActiveTTS(null);
+          window.speechSynthesis.speak(utterance);
+          setActiveTTS(index);
+        }
+      }
+    } else {
+      // Use browser's built-in TTS
+      if (window.speechSynthesis) {
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.rate = 0.9;
+        utterance.onend = () => setActiveTTS(null);
+        window.speechSynthesis.speak(utterance);
+        setActiveTTS(index);
+      }
+    }
   };
 
   // Navigate to character creation - improved error handling 
@@ -466,7 +664,8 @@ function App() {
         currentAction={currentAction} 
         activeTTS={activeTTS} 
         toggleTTS={handleToggleTTS} 
-        storyRef={storyRef} 
+        storyRef={storyRef}
+        audioRef={audioRef} // Pass the audio ref to GameScreen
       />}
       
       {/* Background music player (hidden) */}
@@ -478,6 +677,18 @@ function App() {
           style={{ display: 'none' }} 
         />
       )}
+      
+      {/* Audio player for AI TTS (hidden) - improved configuration */}
+      <audio 
+        ref={audioRef}
+        style={{ display: 'none' }} 
+        controls={false}
+        preload="auto"
+        onError={() => {
+          // Prevent error messages on cleanup/manual stopping
+          console.log("Audio element error - handled");
+        }}
+      />
     </div>
   );
 }

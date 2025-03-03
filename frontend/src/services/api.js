@@ -108,5 +108,13 @@ export const api = {
       console.error('[API] Failed to start new chapter:', error);
       throw error;
     }
+  },
+  
+  async checkMusic() {
+    return callApi('check-music', 'GET');
+  },
+  
+  async generateTTS(text, voice = 'bm_george') {
+    return callApi('generate-tts', 'POST', { text, voice });
   }
 };

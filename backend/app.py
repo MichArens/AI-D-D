@@ -9,7 +9,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import endpoints
-from endpoints import generate_character_options, generate_character_icon, start_game, take_action, check_music, get_available_models, start_new_chapter
+from endpoints import (
+    generate_character_options, 
+    generate_character_icon, 
+    start_game, 
+    take_action, 
+    check_music, 
+    get_available_models, 
+    start_new_chapter,
+    generate_tts_endpoint,
+    TTSRequest
+)
 
 app = FastAPI(title="D&D AI Game Backend")
 
@@ -52,6 +62,9 @@ app.post("/api/take-action")(take_action)
 app.post("/api/start-new-chapter")(start_new_chapter)
 app.get("/api/check-music")(check_music)
 app.get("/api/models")(get_available_models)
+
+# Register the new TTS endpoint
+app.post("/api/generate-tts")(generate_tts_endpoint)
 
 if __name__ == "__main__":
     import uvicorn
