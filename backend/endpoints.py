@@ -153,9 +153,9 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
         
         # If parsing failed, use a fallback approach
         
-        print("Actions:", len(actions), actions)
+      
         if not story_part or len(actions) != 3:
-            # Simple fallback parsing
+            print("Actions:", len(actions), response_text)
             parts = response_text.split("\n\n")
             story_part = parts[0]
             actions = [
@@ -395,8 +395,9 @@ async def take_action(request: ActionRequest):
                     actions.append({"id": len(actions), "text": action_text})
             
             # Fallback if parsing failed
-            print("take action end chapter Actions:", len(actions), actions)
+            
             if len(actions) < 3:
+                print("take action end chapter Actions:", len(actions), actions_response)
                 actions = [
                     {"id": 0, "text": "Explore the new area"},
                     {"id": 1, "text": "Seek out new allies or information"},
@@ -421,8 +422,8 @@ async def take_action(request: ActionRequest):
                         actions.append({"id": len(actions), "text": action_text})
             
             # Fallback parsing
-            print("take action Actions:", len(actions), actions)
             if not story_part or len(actions) != 3:
+                print("take action Actions:", len(actions), response_text)
                 parts = response_text.split("\n\n")
                 story_part = parts[0] if parts else response_text
                 actions = [
@@ -593,6 +594,7 @@ async def start_new_chapter(request: NewChapterRequest):
         
         # If parsing failed, use fallback
         if not story_part or len(actions) != 3:
+            print("New Chapter Actions:", len(actions), response_text)
             story_part = response_text.split("\n\n")[0] if "\n\n" in response_text else response_text
             actions = [
                 {"id": 0, "text": "Investigate the area"},
