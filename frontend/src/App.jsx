@@ -423,8 +423,8 @@ function App() {
     }
   };
   
-  // Handle player action choice - modified to support new chapter flow
-  const handleActionChoice = async (choiceId) => {
+  // Handle player action choice - modified to support new chapter flow and custom actions
+  const handleActionChoice = async (choiceId, customAction = null) => {
     if (loading) return;
     
     setLoading(true);
@@ -432,7 +432,7 @@ function App() {
     setCurrentAction(choiceId);
     
     try {
-      const response = await api.takeAction(gameState, choiceId);
+      const response = await api.takeAction(gameState, choiceId, customAction);
       
       setGameState(prev => {
         // Create a new story segment with unique ID
@@ -442,7 +442,8 @@ function App() {
           _id: `segment-${Date.now()}-${Math.random()}`,
           timestamp: Date.now(),
           player: prev.characters[prev.currentPlayerIndex]?.name,
-          action: prev.storyProgress[prev.storyProgress.length - 1]?.choices?.find(c => c.id === choiceId)?.text
+          // Use custom action text if provided, otherwise get from choices
+          action: customAction || prev.storyProgress[prev.storyProgress.length - 1]?.choices?.find(c => c.id === choiceId)?.text
         };
         
         let updatedChapters = chapterManager.deepCloneWithNewRefs(prev.chapters || []);

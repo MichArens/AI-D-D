@@ -61,6 +61,7 @@ class ActionChoice(BaseModel):
 class ActionRequest(BaseModel):
     gameState: GameState
     choiceId: int
+    customAction: Optional[str] = None  # Add field for custom action text
 
 class StoryResponse(BaseModel):
     text: str

@@ -84,8 +84,8 @@ export const api = {
     return callApi('start-game', 'POST', gameState);
   },
   
-  async takeAction(gameState, choiceId) {
-    return callApi('take-action', 'POST', { gameState, choiceId });
+  async takeAction(gameState, choiceId, customAction = null) {
+    return callApi('take-action', 'POST', { gameState, choiceId, customAction });
   },
   
   async getModels() {

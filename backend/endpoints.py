@@ -212,20 +212,25 @@ async def take_action(request: ActionRequest):
     current_player_idx = game_state.currentPlayerIndex
     current_player = game_state.characters[current_player_idx]
     
-    # Get the action choices and selected action
-    last_story = game_state.storyProgress[-1] if game_state.storyProgress else None
-    
-    if not last_story or "choices" not in last_story:
-        raise HTTPException(status_code=400, detail="Invalid game state: missing action choices")
-    
-    chosen_action = None
-    for choice in last_story.get("choices", []):
-        if choice["id"] == choice_id:
-            chosen_action = choice["text"]
-            break
-    
-    if not chosen_action:
-        raise HTTPException(status_code=400, detail=f"Invalid choice ID: {choice_id}")
+    # Check if this is a custom action
+    if request.customAction:
+        chosen_action = request.customAction
+        logger.info(f"Using custom action: {chosen_action}")
+    else:
+        # Get the action choices and selected action from choices
+        last_story = game_state.storyProgress[-1] if game_state.storyProgress else None
+        
+        if not last_story or "choices" not in last_story:
+            raise HTTPException(status_code=400, detail="Invalid game state: missing action choices")
+        
+        chosen_action = None
+        for choice in last_story.get("choices", []):
+            if choice["id"] == choice_id:
+                chosen_action = choice["text"]
+                break
+        
+        if not chosen_action:
+            raise HTTPException(status_code=400, detail=f"Invalid choice ID: {choice_id}")
     
     # Calculate next player's index
     next_player_idx = (current_player_idx + 1) % len(game_state.characters)
