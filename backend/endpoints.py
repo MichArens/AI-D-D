@@ -242,11 +242,12 @@ async def take_action(request: ActionRequest):
     current_chapter_idx = game_state.currentChapterIndex
     current_chapter = game_state.chapters[current_chapter_idx] if game_state.chapters and len(game_state.chapters) > current_chapter_idx else None
     
-    # Fixed: Ensure chapter ends precisely after 3 rounds
-    end_chapter = rounds_in_chapter >= 3
+    # Use configured rounds per chapter (with fallback to default 3)
+    rounds_per_chapter = getattr(game_state.settings, 'roundsPerChapter', 3)
+    logger.info(f"Chapter length configuration: {rounds_in_chapter}/{rounds_per_chapter} rounds completed")
+    end_chapter = rounds_in_chapter >= rounds_per_chapter
     
     # Create prompt for generating the next story segment
-    # Include story history from this chapter only
     chapter_story = ""
     if current_chapter and current_chapter.segments:
         for seg_idx in current_chapter.segments:

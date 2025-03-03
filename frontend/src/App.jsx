@@ -31,7 +31,8 @@ function App() {
       enableImages: false,
       enableAITTS: false, // Changed from enableTTS to enableAITTS
       enableMusic: false,
-      aiModel: 'llama3'
+      aiModel: 'llama3',
+      roundsPerChapter: 3  // Add default for chapter length
     },
     characters: [],
     storyProgress: [],

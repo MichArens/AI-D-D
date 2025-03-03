@@ -28,6 +28,7 @@ class GameSettings(BaseModel):
     enableAITTS: bool = False  # Changed from enableTTS to enableAITTS
     enableMusic: bool = False
     aiModel: str = "llama3"
+    roundsPerChapter: int = 3  # Add new setting for chapter length, default to 3
 
 class PlayerCharacter(BaseModel):
     name: str
