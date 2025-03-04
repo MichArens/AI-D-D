@@ -127,4 +127,105 @@ sequenceDiagram
 2. If AI TTS is disabled:
    - The frontend falls back to using the browser's built-in `speechSynthesis` API
 
+## Backend Endpoint to AI Service Interaction
+
+The backend endpoints interact with various AI services to generate content for the game. Here's how each endpoint utilizes these services:
+
+```mermaid
+flowchart TD
+    %% Endpoints
+    E1["/api/generate-character-options"]
+    E2["/api/generate-character-icon"]
+    E3["/api/start-game"]
+    E4["/api/take-action"]
+    E5["/api/start-new-chapter"]
+    E6["/api/generate-tts"]
+    E7["/api/models"]
+    
+    %% AI Services
+    S1["generate_text()"]
+    S2["generate_image()"]
+    S3["generate_music()"]
+    S4["generate_tts()"]
+    
+    %% External AI Systems
+    EX1["Ollama LLM API"]
+    EX2["Stable Diffusion API"]
+    EX3["Suno AI API"]
+    EX4["Kokoro TTS"]
+    
+    %% Endpoint to Service connections
+    E2 --> S2
+    E3 --> S1
+    E3 --> S2
+    E3 --> S3
+    E3 --> S4
+    E4 --> S1
+    E4 --> S2
+    E4 --> S4
+    E5 --> S1
+    E5 --> S2
+    E5 --> S4
+    E6 --> S4
+    E7 --> EX1
+    
+    %% Service to External connections
+    S1 --> EX1
+    S2 --> EX2
+    S3 --> EX3
+    S4 --> EX4
+```
+
+### Endpoint to AI Service Mapping:
+
+1. **`/api/generate-character-options`**:
+   - Primarily uses internal logic, not heavily dependent on AI services
+
+2. **`/api/generate-character-icon`**:
+   - Uses `generate_image()` to create character portraits
+   - Passes a prompt describing the character's race, class, and gender
+
+3. **`/api/start-game`**:
+   - Uses `generate_text()` to create initial story and chapter title
+   - Uses `generate_image()` to create scene images (if enabled)
+   - Uses `generate_music()` asynchronously for background music (if enabled)
+   - Uses `generate_tts()` to pre-generate narration audio (if enabled)
+
+4. **`/api/take-action`**:
+   - Uses `generate_text()` to continue story based on player actions
+   - Uses `generate_image()` for scene updates (if enabled)
+   - Uses `generate_tts()` for narration (if enabled)
+
+5. **`/api/start-new-chapter`**:
+   - Uses `generate_text()` to create new chapter opening
+   - Uses `generate_image()` for chapter illustration (if enabled)
+   - Uses `generate_tts()` for narration (if enabled)
+
+6. **`/api/generate-tts`**:
+   - Directly calls `generate_tts()` for on-demand audio generation
+
+7. **`/api/models`**:
+   - Queries Ollama API directly to get available models
+
+### AI Services:
+
+1. **`generate_text()`**:
+   - Makes requests to Ollama API with carefully crafted prompts
+   - Handles prompt engineering and formatting instructions
+   - Returns generated text content
+
+2. **`generate_image()`**:
+   - Communicates with Stable Diffusion API
+   - Enhances prompts with D&D-themed descriptions
+   - Returns base64-encoded image data
+
+3. **`generate_music()`**:
+   - Makes API calls to Suno AI
+   - Returns URL to generated background music
+
+4. **`generate_tts()`**:
+   - Uses Kokoro TTS pipeline to generate speech audio
+   - Processes text in sentence chunks for natural speech
+   - Returns base64-encoded audio data
+
 This sequence ensures a seamless game experience where the AI-generated content (text, images, audio) is delivered to the player at the appropriate moments throughout their adventure.
