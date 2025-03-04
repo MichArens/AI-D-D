@@ -28,6 +28,7 @@ class GameSettings(BaseModel):
     enableAITTS: bool = False  # Changed from enableTTS to enableAITTS
     enableMusic: bool = False
     aiModel: str = "llama3"
+    roundsPerChapter: int = 3  # Add new setting for chapter length, default to 3
 
 class PlayerCharacter(BaseModel):
     name: str
@@ -53,6 +54,7 @@ class GameState(BaseModel):
     chapters: List[Chapter] = []
     currentChapterIndex: int = 0
     roundsInCurrentChapter: int = 0
+    chapterCycle: int = 0  # Track which chapter in the cycle (0, 1, 2)
 
 class ActionChoice(BaseModel):
     id: int
@@ -61,6 +63,7 @@ class ActionChoice(BaseModel):
 class ActionRequest(BaseModel):
     gameState: GameState
     choiceId: int
+    customAction: Optional[str] = None  # Add field for custom action text
 
 class StoryResponse(BaseModel):
     text: str

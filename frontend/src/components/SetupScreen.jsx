@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const SetupScreen = ({ 
   gameState, 
@@ -9,12 +9,46 @@ const SetupScreen = ({
   error, 
   setScreen 
 }) => {
+  // Add state to track if custom chapter length is selected
+  const [customChapterLength, setCustomChapterLength] = useState(false);
+  const [customLengthValue, setCustomLengthValue] = useState(3); // Default value
+  
   // Helper to safely handle settings changes
   const handleSettingsChange = (setting, value) => {
     setGameState(prev => ({
       ...prev,
       settings: { ...(prev.settings || {}), [setting]: value }
     }));
+  };
+
+  // Special handler for chapter length changes
+  const handleChapterLengthChange = (e) => {
+    const value = e.target.value;
+    
+    // Check if "custom" option is selected
+    if (value === 'custom') {
+      setCustomChapterLength(true);
+      // Keep the current value or default to 3
+      const currentValue = gameState.settings?.roundsPerChapter || 3;
+      setCustomLengthValue(currentValue);
+    } else {
+      setCustomChapterLength(false);
+      // Convert value to integer and update game state
+      handleSettingsChange('roundsPerChapter', parseInt(value));
+    }
+  };
+  
+  // Handle custom length input changes with validation
+  const handleCustomLengthChange = (e) => {
+    let value = parseInt(e.target.value);
+    
+    // Ensure value is within reasonable limits (1-20)
+    if (isNaN(value)) value = 3;
+    if (value < 1) value = 1;
+    if (value > 20) value = 20;
+    
+    setCustomLengthValue(value);
+    handleSettingsChange('roundsPerChapter', value);
   };
 
   return (
@@ -38,6 +72,40 @@ const SetupScreen = ({
               <option value="3">3 Players</option>
               <option value="4">4 Players</option>
             </select>
+          </div>
+          
+          <div className="form-group">
+            <label>Chapter Length:</label>
+            <select 
+              value={customChapterLength ? 'custom' : (gameState.settings?.roundsPerChapter || 3)} 
+              onChange={handleChapterLengthChange}
+            >
+              <option value="1">1 Round (Very Short)</option>
+              <option value="2">2 Rounds (Short)</option>
+              <option value="3">3 Rounds (Medium)</option>
+              <option value="4">4 Rounds (Long)</option>
+              <option value="5">5 Rounds (Very Long)</option>
+              <option value="custom">Custom...</option>
+            </select>
+            
+            {customChapterLength && (
+              <div className="custom-length-input">
+                <label htmlFor="customRounds">Custom rounds per chapter:</label>
+                <input
+                  id="customRounds"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={customLengthValue}
+                  onChange={handleCustomLengthChange}
+                  className="custom-number-input"
+                />
+              </div>
+            )}
+            
+            <div className="setting-description">
+              Controls how many player actions occur in each chapter
+            </div>
           </div>
           
           <div className="form-group">

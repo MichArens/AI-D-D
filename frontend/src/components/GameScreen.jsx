@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import HighlightedText from './HighlightedText';
 import SpeakerIcon from './SpeakerIcon';
 import SpeakerMuteIcon from './SpeakerMuteIcon';
@@ -19,7 +19,9 @@ const GameScreen = ({
   storyRef,
   audioRef // Get audio ref from parent
 }) => {
-  // Remove local audioRef since we're using the one from App.jsx
+  // State for custom action input
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customAction, setCustomAction] = useState('');
   
   // Safe access to current chapter
   const currentChapter = gameState.chapters && gameState.chapters.length > gameState.currentChapterIndex ? 
@@ -34,6 +36,15 @@ const GameScreen = ({
   
   // Check if chapters are available
   const hasChapters = gameState.chapters && gameState.chapters.length > 0;
+
+  // Handle custom action submission
+  const handleCustomActionSubmit = () => {
+    if (customAction.trim()) {
+      handleActionChoice(-1, customAction);
+      setCustomAction('');
+      setShowCustomInput(false);
+    }
+  };
 
   // Improved function to format chapter titles - use same format everywhere
   const formatChapterTitle = (title, index) => {
@@ -57,7 +68,37 @@ const GameScreen = ({
   
   return (
     <div className="game-screen">
-      {/* Remove the local audio element since we're using the one from App.jsx */}
+      {/* Custom action modal */}
+      {showCustomInput && (
+        <div className="custom-action-modal">
+          <div className="modal-content">
+            <h3>Create Your Own Action</h3>
+            <p>Describe what {gameState.characters[gameState.currentPlayerIndex]?.name} will do:</p>
+            <textarea 
+              value={customAction}
+              onChange={(e) => setCustomAction(e.target.value)}
+              placeholder="Describe your action here..."
+              rows={4}
+              maxLength={200}
+            />
+            <div className="custom-action-buttons">
+              <button 
+                className="secondary-button" 
+                onClick={() => setShowCustomInput(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="main-button" 
+                onClick={handleCustomActionSubmit}
+                disabled={!customAction.trim() || loading}
+              >
+                Submit Action
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Sticky chapter header at top of screen - always show even if null with a fallback */}
       <div className="sticky-chapter-header">
@@ -237,17 +278,29 @@ const GameScreen = ({
                     
                     {/* Show action buttons when not loading */}
                     {!loading && gameState.storyProgress.length > 0 && 
-                     gameState.storyProgress[gameState.storyProgress.length - 1].choices && 
-                     gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
-                      <button 
-                        key={choice.id} 
-                        className={`action-button ${currentAction === choice.id ? 'selected' : ''}`}
-                        onClick={() => handleActionChoice(choice.id)}
-                        disabled={loading}
-                      >
-                        {choice.text}
-                      </button>
-                    ))}
+                     gameState.storyProgress[gameState.storyProgress.length - 1].choices && (
+                      <>
+                        {gameState.storyProgress[gameState.storyProgress.length - 1].choices.map(choice => (
+                          <button 
+                            key={choice.id} 
+                            className={`action-button ${currentAction === choice.id ? 'selected' : ''}`}
+                            onClick={() => handleActionChoice(choice.id)}
+                            disabled={loading}
+                          >
+                            {choice.text}
+                          </button>
+                        ))}
+                        
+                        {/* Add custom action button */}
+                        <button 
+                          className="action-button custom-action-button"
+                          onClick={() => setShowCustomInput(true)}
+                          disabled={loading}
+                        >
+                          Create your own action...
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
                 
