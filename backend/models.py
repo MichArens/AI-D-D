@@ -82,3 +82,7 @@ class NewChapterRequest(BaseModel):
         extra = "ignore"
         # Allow coercing types when possible
         arbitrary_types_allowed = True
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "bm_george"  # Default voice
