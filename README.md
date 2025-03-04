@@ -8,6 +8,8 @@ An AI-powered Dungeons & Dragons adventure game with a React frontend and FastAP
 - Python (v3.8 or higher)
 - npm or yarn
 - pip
+- Ollama
+- working stablediffustion https://github.com/AUTOMATIC1111/stable-diffusion-webui
 
 ## Installation
 
