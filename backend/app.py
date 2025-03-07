@@ -4,23 +4,19 @@ from fastapi.responses import JSONResponse
 import logging
 import traceback
 
+from endpoints.generate_tts_endpoint import generate_tts_endpoint
+from endpoints.check_music_endpoint import check_music
+from endpoints.generate_character_icon_endpoint import generate_character_icon
+from endpoints.generate_character_options_endpoint import generate_character_options
+from endpoints.get_available_models_endpoint import get_available_models
+from endpoints.start_game_endpoint import start_game
+from endpoints.start_new_chapter_endpoint import start_new_chapter
+from endpoints.take_action_endpoint import take_action
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Import endpoints
-from models import ActionRequest
-from endpoints import (
-    generate_character_options, 
-    generate_character_icon, 
-    start_game, 
-    take_action, 
-    check_music, 
-    get_available_models, 
-    start_new_chapter,
-    generate_tts_endpoint,
-    TTSRequest
-)
 
 app = FastAPI(title="D&D AI Game Backend")
 
@@ -44,39 +40,7 @@ app.add_middleware(
 )
 
 # Register endpoints with logger
-@app.post("/api/generate-character-options")
-async def wrapped_generate_character_options():
-    logger.info("Received request for character options")
-    try:
-        result = await generate_character_options()
-        logger.info(f"Returning character options: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Error in generate_character_options: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-@app.post("/api/take-action")
-async def wrapped_take_action(request: ActionRequest):
-    logger.info("Received action request")
-    try:
-        # Log the request details for debugging
-        if hasattr(request, 'customAction') and request.customAction:
-            logger.info(f"Custom action: {request.customAction[:100]}...")
-        else:
-            logger.info(f"Action choice ID: {request.choiceId}")
-        
-        result = await take_action(request)
-        
-        # Log success
-        logger.info(f"Action processed successfully, returned {len(result.get('choices', []))} choices")
-        return result
-    except Exception as e:
-        logger.error(f"Error in take_action: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-# Register other endpoints
+app.post("/api/generate-character-options")(generate_character_options)
 app.post("/api/generate-character-icon")(generate_character_icon)
 app.post("/api/start-game")(start_game)
 app.post("/api/take-action")(take_action)

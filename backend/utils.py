@@ -1,5 +1,8 @@
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
+
+from models import GameState
+from utilities.prompt_constants import PromptConstants
 
 logger = logging.getLogger(__name__)
 
@@ -7,7 +10,7 @@ class StoryContextTracker:
     """Utility class to track and maintain story context between chapters"""
     
     @staticmethod
-    def extract_chapter_context(game_state: Dict[str, Any]) -> Dict[str, Any]:
+    def extract_chapter_context(game_state: GameState) -> Dict[str, Any]:
         """Extract relevant context from the previous chapter"""
         context = {
             "previous_chapter_summary": "",
@@ -21,14 +24,14 @@ class StoryContextTracker:
         
         try:
             # Get chapter information
-            if 'chapters' in game_state and len(game_state['chapters']) > 0:
-                prev_chapter = game_state['chapters'][-1]
+            if game_state.chapters is not None and len(game_state.chapters) > 0:
+                prev_chapter = game_state.chapters[-1]
                 
                 # Get basic chapter info
-                if 'summary' in prev_chapter and prev_chapter['summary']:
-                    context["previous_chapter_summary"] = prev_chapter['summary']
-                if 'title' in prev_chapter:
-                    context["previous_chapter_title"] = prev_chapter['title']
+                if prev_chapter.summary:
+                    context["previous_chapter_summary"] = prev_chapter.summary
+                if prev_chapter.title:
+                    context["previous_chapter_title"] = prev_chapter.title
                 
                 # Extract location and key characters from summary
                 if context["previous_chapter_summary"]:
@@ -43,22 +46,22 @@ class StoryContextTracker:
                             context["location"] = locations[0]  # Just take the first one as a guess
                 
                 # Get the last segment for ending context
-                if 'segments' in prev_chapter and prev_chapter['segments'] and 'storyProgress' in game_state:
-                    last_segment_idx = prev_chapter['segments'][-1]
+                if prev_chapter.segments and game_state.storyProgress:
+                    last_segment_idx = prev_chapter.segments[-1]
                     
-                    if len(game_state['storyProgress']) > last_segment_idx:
-                        last_segment = game_state['storyProgress'][last_segment_idx]
-                        if 'text' in last_segment:
-                            context["previous_chapter_ending"] = last_segment['text']
-                        if 'player' in last_segment and 'action' in last_segment:
-                            context["last_player_action"] = f"{last_segment['player']} chose to {last_segment['action']}"
+                    if len(game_state.storyProgress) > last_segment_idx:
+                        last_segment = game_state.storyProgress[last_segment_idx]
+                        if last_segment.text:
+                            context["previous_chapter_ending"] = last_segment.text
+                        if last_segment.player and last_segment.action:
+                            context["last_player_action"] = f"{last_segment.player} chose to {last_segment.action}"
                 
                 # Extract character names from story progress
-                if 'storyProgress' in game_state and game_state['storyProgress']:
+                if game_state.storyProgress and game_state:
                     # Look through all segments for character references
-                    for segment in game_state['storyProgress']:
-                        if 'text' in segment and segment['text']:
-                            text = segment['text']
+                    for segment in game_state.storyProgress:
+                        if segment.text:
+                            text = segment.text
                             # Simple NPC extraction - look for quoted speech with attribution
                             import re
                             speech_patterns = re.findall(r'"([^"]+)" (?:said|replied|exclaimed|shouted|whispered) ([A-Z][a-z]+)', text)
@@ -114,10 +117,9 @@ class ChapterManager:
         return ChapterManager.calculate_chapter_cycle(chapter_index) == 2
     
     @staticmethod
-    def create_chapter_transition_prompt(game_state: Dict[str, Any], next_chapter_title: str) -> str:
+    def create_chapter_transition_prompt(game_state: GameState, next_chapter_title: str) -> str:
         """Create appropriate prompt for chapter transition based on cycle position"""
-        current_chapter_idx = game_state.get('currentChapterIndex', 0)
-        next_chapter_idx = current_chapter_idx + 1
+        current_chapter_idx = game_state.currentChapterIndex
         
         # Determine if we're starting fresh after a cycle end
         starting_fresh = ChapterManager.is_cycle_end(current_chapter_idx)
@@ -130,22 +132,22 @@ class ChapterManager:
             return ChapterManager.create_continuation_chapter_prompt(game_state, next_chapter_title)
     
     @staticmethod
-    def create_fresh_chapter_prompt(game_state: Dict[str, Any], next_chapter_title: str) -> str:
+    def create_fresh_chapter_prompt(game_state: GameState, next_chapter_title: str) -> str:
         """Create a prompt for starting a new storyline after a completed chapter arc"""
-        characters = game_state.get('characters', [])
+        characters = game_state.characters
         character_descriptions = []
         
         for char in characters:
-            char_name = char.get('name', 'Unknown')
-            char_race = char.get('race', 'Unknown')
-            char_class = char.get('characterClass', 'Unknown')
-            char_gender = char.get('gender', 'Unknown')
+            char_name = char.name
+            char_race = char.race
+            char_class = char.characterClass
+            char_gender = char.gender
             character_descriptions.append(f"{char_name} the {char_race} {char_class}, {char_gender}")
         
         party_description = ", ".join(character_descriptions)
         
         # Get first player info for actions
-        first_player_idx = game_state.get('currentPlayerIndex', 0)
+        first_player_idx = game_state.currentPlayerIndex
         first_player = characters[first_player_idx] if first_player_idx < len(characters) else {"name": "the player"}
         
         # Create prompt for a fresh start
@@ -168,29 +170,29 @@ class ChapterManager:
         
         Format your response as follows:
         
-        STORY:
+        {PromptConstants.STORY}
         [Your brief opening scene introducing a new story arc]
         
-        ACTIONS:
+        {PromptConstants.ACTIONS}
         1. [First action choice for {first_player.get('name', 'the player')} ONLY]
         2. [Second action choice for {first_player.get('name', 'the player')} ONLY]
         3. [Third action choice for {first_player.get('name', 'the player')} ONLY]
         """
     
     @staticmethod
-    def create_continuation_chapter_prompt(game_state: Dict[str, Any], next_chapter_title: str) -> str:
+    def create_continuation_chapter_prompt(game_state: GameState, next_chapter_title: str) -> str:
         """Create a prompt for continuing the current story arc"""
         # Get previous chapter context
         context = StoryContextTracker.extract_chapter_context(game_state)
         
-        characters = game_state.get('characters', [])
+        characters = game_state.characters
         character_descriptions = []
         
         for char in characters:
-            char_name = char.get('name', 'Unknown')
-            char_race = char.get('race', 'Unknown')
-            char_class = char.get('characterClass', 'Unknown')
-            char_gender = char.get('gender', 'Unknown')
+            char_name = char.name
+            char_race = char.race
+            char_class = char.characterClass
+            char_gender = char.gender
             character_descriptions.append(f"{char_name} the {char_race} {char_class}, {char_gender}")
         
         party_description = ", ".join(character_descriptions)
@@ -210,7 +212,7 @@ class ChapterManager:
             chapter_transition_context += f"\nThe last action was: {context['last_player_action']}\n"
         
         # Get first player info for actions
-        first_player_idx = game_state.get('currentPlayerIndex', 0)
+        first_player_idx = game_state.currentPlayerIndex
         first_player = characters[first_player_idx] if first_player_idx < len(characters) else {"name": "the player"}
         
         # Create prompt for continuity
@@ -230,96 +232,16 @@ class ChapterManager:
         - Show how the chapter title "{next_chapter_title}" relates to what just happened before.
         - Focus on action and immediate events, not lengthy descriptions.
         
-        Then, provide exactly 3 possible actions that ONLY {first_player.get('name', 'the player')} could take 
+        Then, provide exactly 3 possible actions that ONLY {first_player.name} could take 
         in direct response to the situation that was unfolding at the end of the previous chapter.
         
         Format your response as follows:
         
-        STORY:
+        {PromptConstants.STORY}
         [Your brief opening scene that DIRECTLY continues from the previous chapter]
         
-        ACTIONS:
-        1. [First action choice for {first_player.get('name', 'the player')} ONLY]
-        2. [Second action choice for {first_player.get('name', 'the player')} ONLY]
-        3. [Third action choice for {first_player.get('name', 'the player')} ONLY]
+        {PromptConstants.ACTIONS}
+        1. [First action choice for {first_player.name} ONLY]
+        2. [Second action choice for {first_player.name} ONLY]
+        3. [Third action choice for {first_player.name} ONLY]
         """
-
-class TextParser:
-    """Utility class to help with parsing AI responses"""
-    
-    @staticmethod
-    def extract_sections(text, markers=None):
-        """Extract sections from text based on markers"""
-        if not markers:
-            markers = ["STORY:", "ACTIONS:", "NEXT CHAPTER:"]
-        
-        sections = {}
-        current_marker = None
-        current_content = []
-        
-        # Add a sentinel marker at the end to simplify processing
-        text += "\n\nEND_OF_TEXT"
-        markers.append("END_OF_TEXT")
-        
-        for line in text.split('\n'):
-            # Check if this line starts a new section
-            new_marker_found = False
-            for marker in markers:
-                if line.strip().startswith(marker):
-                    # If we were collecting content for a previous marker, save it
-                    if current_marker:
-                        sections[current_marker] = '\n'.join(current_content).strip()
-                        current_content = []
-                    
-                    # Start collecting for the new marker
-                    current_marker = marker
-                    # Remove the marker from the line
-                    remaining_content = line[len(marker):].strip()
-                    if remaining_content:
-                        current_content.append(remaining_content)
-                    new_marker_found = True
-                    break
-            
-            # If no new marker was found and we have a current marker, add line to content
-            if not new_marker_found and current_marker:
-                current_content.append(line)
-        
-        # Remove the sentinel
-        if "END_OF_TEXT" in sections:
-            del sections["END_OF_TEXT"]
-            
-        return sections
-    
-    @staticmethod
-    def extract_numbered_items(text):
-        """Extract numbered items (like action choices) from text"""
-        import re
-        
-        # Try multiple regex patterns to find numbered items
-        patterns = [
-            r'(?:^|\n)\s*(\d+)\.\s*([^\n]+)',  # Standard numbered items
-            r'(?:^|\n)\s*(\d+)\)\s*([^\n]+)',   # Numbers with parentheses
-            r'(?:^|\n)\s*(\d+)\s+([^\n]+)',     # Numbers followed by text with space
-        ]
-        
-        # Try each pattern in order
-        for pattern in patterns:
-            items = re.findall(pattern, text)
-            if items:
-                # Convert to dicts with id and text
-                return [{"id": int(num)-1, "text": content.strip()} for num, content in items]
-        
-        # If no pattern matched, try a more aggressive approach
-        lines = text.split('\n')
-        numbered_items = []
-        
-        for line in lines:
-            line = line.strip()
-            if line and line[0].isdigit() and len(line) > 2:
-                # Try to find where the actual content starts after the number
-                parts = re.match(r'(\d+)(?:\.|:|\)|\s)\s*(.+)', line)
-                if parts:
-                    num, content = parts.groups()
-                    numbered_items.append({"id": int(num)-1, "text": content.strip()})
-        
-        return numbered_items

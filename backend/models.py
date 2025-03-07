@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from enum import Enum
 
@@ -45,20 +45,30 @@ class Chapter(BaseModel):
     image: Optional[str] = None  # Base64 encoded image
     segments: List[int] = []  # Indices of story segments in this chapter
 
-class GameState(BaseModel):
-    settings: GameSettings
-    characters: List[PlayerCharacter] = []
-    storyProgress: List[Dict[str, Any]] = []
-    currentPlayerIndex: int = 0
-    musicUrl: Optional[str] = None
-    chapters: List[Chapter] = []
-    currentChapterIndex: int = 0
-    roundsInCurrentChapter: int = 0
-    chapterCycle: int = 0  # Track which chapter in the cycle (0, 1, 2)
 
 class ActionChoice(BaseModel):
     id: int
     text: str
+
+class StoryProgression(BaseModel):
+    text: str
+    image: Optional[str] = None
+    player: Optional[str] = None
+    action: Optional[str] = None
+    chapterId: int
+    audioData: Optional[str] = None
+    choices: List[ActionChoice] = []
+
+class GameState(BaseModel):
+    settings: GameSettings
+    characters: List[PlayerCharacter] = Field(default_factory=list)
+    storyProgress: List[StoryProgression] = Field(default_factory=list)
+    currentPlayerIndex: int = 0
+    musicUrl: Optional[str] = None
+    chapters: List[Chapter] = Field(default_factory=list)
+    currentChapterIndex: int = 0
+    roundsInCurrentChapter: int = 0
+    chapterCycle: int = 0  # Track which chapter in the cycle (0, 1, 2)
 
 class ActionRequest(BaseModel):
     gameState: GameState
@@ -74,14 +84,12 @@ class CharacterIconRequest(BaseModel):
     character: PlayerCharacter
     
 class NewChapterRequest(BaseModel):
-    gameState: Dict[str, Any]
+    gameState: GameState
     nextChapterTitle: str
     
     class Config:
         # Make the model more permissive with extra fields
         extra = "ignore"
-        # Allow coercing types when possible
-        arbitrary_types_allowed = True
 
 class TTSRequest(BaseModel):
     text: str
