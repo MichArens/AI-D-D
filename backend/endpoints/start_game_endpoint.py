@@ -19,8 +19,8 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     model = game_state.settings.aiModel
     enable_tts = game_state.settings.enableAITTS
     
-    party_description = create_party_description(game_state.characters)
-    chapter_prompt = create_chapter_title_prompt(party_description)
+    party_description = _create_party_description(game_state.characters)
+    chapter_prompt = _create_chapter_title_prompt(party_description)
     try:
         chapter_title = await generate_text(chapter_prompt, model)
         chapter_title = chapter_title.strip().strip('"').strip("'")
@@ -31,7 +31,7 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
             segments=[]
         )
         
-        prompt = create_initial_story_prompt(game_state, party_description, chapter_title)
+        prompt = _create_initial_story_prompt(game_state, party_description, chapter_title)
         first_story_text = await generate_text(prompt, model)
         
         next_story_part, next_actions = parse_story_and_actions(first_story_text)
@@ -42,9 +42,7 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
             next_story_part = parts[0]
             next_actions = generate_fallback_actions(parts)
         
-        image_base64 = None
-        if game_state.settings.enableImages:
-            image_base64 = await generate_image(next_story_part[:200]) 
+        image_base64 = await _generate_image_for_starT_game(game_state.settings.enableImages, next_story_part)
         
         audio_data = await maybe_generate_tts(next_story_part, enable_tts)
         
@@ -75,7 +73,7 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start game: {str(e)}")
 
-def create_party_description(characters: List[PlayerCharacter]):
+def _create_party_description(characters: List[PlayerCharacter]):
     character_descriptions = []
     for char in characters:
         character_descriptions.append(f"{char.name} the {char.race} {char.characterClass}, {char.gender}")
@@ -83,7 +81,7 @@ def create_party_description(characters: List[PlayerCharacter]):
     party_description = ", ".join(character_descriptions)
     return party_description
 
-def create_chapter_title_prompt(party_description: str):
+def _create_chapter_title_prompt(party_description: str):
     return f"""
     {get_dnd_master_description("for a new D&D adventure")}. Create an engaging chapter title for the beginning of an adventure
     with a party consisting of: {party_description}
@@ -91,7 +89,7 @@ def create_chapter_title_prompt(party_description: str):
     The title should be short (5-7 words) and evocative. Format your response with just the title, no additional text.
     """
 
-def create_initial_story_prompt(game_state: GameState, party_description: str, chapter_title: str):
+def _create_initial_story_prompt(game_state: GameState, party_description: str, chapter_title: str):
     return f"""
         {get_dnd_master_description("for a new D&D adventure")}. Create an engaging opening scene for a party consisting of:
         {party_description}
@@ -114,3 +112,12 @@ def create_initial_story_prompt(game_state: GameState, party_description: str, c
         2. [Second action choice for {game_state.characters[0].name} ONLY]
         3. [Third action choice for {game_state.characters[0].name} ONLY]
         """
+
+async def _generate_image_for_starT_game(enableImages: bool, next_story_part: str):
+    image_base64 = None
+    if enableImages:
+        prompt = next_story_part[:200]
+        enhanced_prompt = f"fantasy art, dungeons and dragons style, establishing shot, new adventure beginning, fresh start, {prompt}"
+        enhanced_prompt += ", vibrant colors, wide landscape view, new horizon, detailed environment, adventure awaits"
+        image_base64 = await generate_image(enhanced_prompt) 
+    return image_base64

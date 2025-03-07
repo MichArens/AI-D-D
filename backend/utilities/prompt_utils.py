@@ -76,32 +76,6 @@ def parse_story_and_actions(next_progression_text: str)->Tuple[str, List[ActionC
             actions = [ActionChoice(id = i, text = text.strip()) for i, text in enumerate(all_potential_actions)]
     
     return story_part, actions
-
-async def generate_appropriate_image(settings: GameSettings, context: ImageContextEnum, story_text, chapter_summary: Optional[str]=None, chapter_title: Optional[str]=None, party_description: Optional[str]=None):
-    """Generate an appropriate image based on context and available information"""
-    if not settings.enableImages:
-        return None
-    
-    try:
-        image_prompt = None
-        
-        if context == ImageContextEnum.CHAPTER_TRANSITION and chapter_summary and chapter_title:
-            # Transition between chapters
-            image_prompt = f"Fantasy D&D scene showing transition: {chapter_summary} → {chapter_title} - {story_text[:100]}"
-        elif context == ImageContextEnum.CHAPTER_TRANSITION and chapter_title and party_description:
-            # New chapter without previous summary
-            image_prompt = f"Fantasy D&D scene for '{chapter_title}' showing the party: {party_description}"
-        elif context == ImageContextEnum.CHAPTER_SUMMARY and chapter_summary:
-            image_prompt = f"Fantasy illustration of: {chapter_summary}"
-        else:
-            # Generic story illustration
-            image_prompt = story_text[:200]
-            
-        logger.info(f"Generating image with context '{context}' and prompt: {image_prompt[:50]}...")
-        return await generate_image(image_prompt)
-    except Exception as e:
-        logger.error(f"Failed to generate image: {e}")
-        return None
     
 def generate_fallback_actions(character_name: Optional[str]=None, context: Literal["generic", "new_chapter", "chapter_end"] = "generic"):
     """Generate fallback actions when parsing fails"""

@@ -4,10 +4,11 @@ from typing import List, Literal, Union
 
 from fastapi import HTTPException
 from ai.text_ai_service import generate_text
+from utilities.image_generation_utils import generate_appropriate_image
 from utilities.image_context_enum import ImageContextEnum
 from utilities.prompt_constants import PromptConstants
 from utils import ChapterManager
-from utilities.prompt_utils import generate_appropriate_image, generate_fallback_actions, get_dnd_master_description, maybe_generate_tts, parse_story_and_actions
+from utilities.prompt_utils import generate_fallback_actions, get_dnd_master_description, maybe_generate_tts, parse_story_and_actions
 from models import ActionRequest, Chapter, GameState, PlayerCharacter, StoryProgression
 
 logging.basicConfig(level=logging.INFO)
