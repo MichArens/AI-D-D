@@ -2,7 +2,8 @@ import logging
 
 from fastapi import HTTPException
 
-from ai_services import generate_image
+
+from ai.image_ai_service import generate_image
 from models import CharacterIconRequest, PlayerCharacter
 
 logging.basicConfig(level=logging.INFO)

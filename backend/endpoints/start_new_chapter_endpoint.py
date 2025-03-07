@@ -3,7 +3,7 @@ import traceback
 
 from fastapi import HTTPException
 
-from ai_services import generate_text
+from ai.text_ai_service import generate_text
 from models import NewChapterRequest
 from utilities.image_context_enum import ImageContextEnum
 from utilities.prompt_utils import generate_appropriate_image, generate_fallback_actions, maybe_generate_tts, parse_story_and_actions

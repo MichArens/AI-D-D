@@ -1,7 +1,8 @@
 import logging
 from typing import List, Literal, Optional, Tuple
 
-from ai_services import generate_image, generate_tts
+from ai.image_ai_service import generate_image
+from ai.tts_ai_service import generate_tts
 from utilities.image_context_enum import ImageContextEnum
 from utilities.prompt_constants import PromptConstants
 from models import ActionChoice, GameSettings

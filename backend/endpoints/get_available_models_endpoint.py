@@ -1,6 +1,8 @@
+from ai.text_ai_service import OLLAMA_BASE_URL
+
 async def get_available_models():
     """Get available models from Ollama"""
-    from ai_services import OLLAMA_BASE_URL
+
     import httpx
     try:
         async with httpx.AsyncClient() as client:

@@ -3,8 +3,10 @@ from typing import List
 
 from fastapi import BackgroundTasks, HTTPException
 
-from ai_services import generate_image, generate_music, generate_text
-from models import Chapter, GameState, PlayerCharacter
+from ai.text_ai_service import generate_text
+from ai.image_ai_service import generate_image
+from ai.music_ai_service import generate_music
+from models import Chapter, GameState, PlayerCharacter, StoryProgression
 from utilities.prompt_constants import PromptConstants
 from utilities.prompt_utils import generate_fallback_actions, get_dnd_master_description, maybe_generate_tts, parse_story_and_actions
 
@@ -40,28 +42,24 @@ async def start_game(game_state: GameState, background_tasks: BackgroundTasks):
             next_story_part = parts[0]
             next_actions = generate_fallback_actions(parts)
         
-        # Generate image for the story if enabled
         image_base64 = None
         if game_state.settings.enableImages:
-            image_base64 = await generate_image(next_story_part[:200])  # Use first part of story as prompt
+            image_base64 = await generate_image(next_story_part[:200]) 
         
-        # Pre-generate TTS for the story if enabled
         audio_data = await maybe_generate_tts(next_story_part, enable_tts)
         
-        # Generate background music if enabled
         music_url = None
         if game_state.settings.enableMusic:
             background_tasks.add_task(generate_music, next_story_part[:100])
         
-        # Update the story progress with audio data
-        initial_story = {
-            "text": next_story_part,
-            "image": image_base64,
-            "player": None,
-            "action": None,
-            "chapterId": 0,
-            "audioData": audio_data  # Include pre-generated TTS
-        }
+        initial_story = StoryProgression(
+            text = next_story_part,
+            image = image_base64,
+            player = None,
+            action = None,
+            chapterId = 0,
+            audioData = audio_data  # Include pre-generated TTS
+        )
         
         # Update first chapter with segment index
         first_chapter.segments.append(0)

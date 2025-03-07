@@ -2,7 +2,7 @@ import logging
 import traceback
 
 from fastapi import HTTPException
-from ai_services import generate_tts
+from ai.tts_ai_service import generate_tts
 from models import TTSRequest
 
 logging.basicConfig(level=logging.INFO)
