@@ -531,7 +531,8 @@ function App() {
             race: c.race,
             characterClass: c.characterClass,
             gender: c.gender,
-            icon: null // Don't send huge base64 strings
+            icon: null, // Don't send huge base64 strings
+            playerIndex: c.playerIndex
           })),
           currentPlayerIndex: nextChapter.pendingPlayerIndex
         },

@@ -1,3 +1,4 @@
+from typing import Optional
 import httpx
 import os
 import base64
@@ -7,6 +8,8 @@ import io
 import numpy as np
 from scipy.io import wavfile
 import logging
+
+from utilities.prompt_constants import PromptConstants
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -25,18 +28,18 @@ except Exception as e:
     logger.error(f"Error initializing Kokoro TTS pipeline: {e}")
     KOKORO_PIPELINE = None
 
-async def generate_text(prompt: str, model: str = "llama3"):
+async def generate_text(prompt: str, model: str = "llama3")-> str:
     """Generate text using Ollama API"""
     try:
         # Add formatting reminders to help with parsing
-        if "ACTIONS:" in prompt or "action choices" in prompt:
-            prompt += "\n\nIMPORTANT FORMATTING INSTRUCTIONS:\n" \
-                     "- Always start your response with 'STORY:'\n" \
-                     "- Then add 'ACTIONS:' on a new line before listing the actions\n" \
+        if PromptConstants.ACTIONS in prompt or "action choices" in prompt:
+            prompt += f"\n\nIMPORTANT FORMATTING INSTRUCTIONS:\n" \
+                     f"- Always start your response with '{PromptConstants.STORY}'\n" \
+                     f"- Then add '{PromptConstants.ACTIONS}' on a new line before listing the actions\n" \
                      "- Number each action with a digit followed by a period (1., 2., etc.)"
                      
         # Add a formatting reminder for chapter titles
-        if "NEXT CHAPTER:" in prompt:
+        if PromptConstants.NEXT_CHAPTER in prompt:
             prompt += "\n\nNote: The NEXT CHAPTER title should be brief (3-7 words) and on its own line."
         
         logger.info(f"Sending prompt to model {model} (first 100 chars): {prompt[:100]}...")
@@ -131,7 +134,7 @@ async def generate_music(prompt: str):
         return None
     
 
-async def generate_tts(text: str, voice='bm_george'):
+async def generate_tts(text: str, voice='bm_george')-> Optional[str]:
     """
     Generate text-to-speech audio using Kokoro
     Returns base64-encoded MP3 audio data

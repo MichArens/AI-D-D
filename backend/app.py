@@ -9,17 +9,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import endpoints
-from models import ActionRequest
+from endpoints_logic.start_game_endpoint import start_game
+from endpoints_logic.take_action_endpoint import take_action
 from endpoints import (
     generate_character_options, 
     generate_character_icon, 
-    start_game, 
-    take_action, 
     check_music, 
     get_available_models, 
     start_new_chapter,
     generate_tts_endpoint,
-    TTSRequest
 )
 
 app = FastAPI(title="D&D AI Game Backend")
@@ -53,26 +51,6 @@ async def wrapped_generate_character_options():
         return result
     except Exception as e:
         logger.error(f"Error in generate_character_options: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-@app.post("/api/take-action")
-async def wrapped_take_action(request: ActionRequest):
-    logger.info("Received action request")
-    try:
-        # Log the request details for debugging
-        if hasattr(request, 'customAction') and request.customAction:
-            logger.info(f"Custom action: {request.customAction[:100]}...")
-        else:
-            logger.info(f"Action choice ID: {request.choiceId}")
-        
-        result = await take_action(request)
-        
-        # Log success
-        logger.info(f"Action processed successfully, returned {len(result.get('choices', []))} choices")
-        return result
-    except Exception as e:
-        logger.error(f"Error in take_action: {e}")
         logger.error(traceback.format_exc())
         raise
 
