@@ -4,21 +4,19 @@ from fastapi.responses import JSONResponse
 import logging
 import traceback
 
+from endpoints.generate_tts_endpoint import generate_tts_endpoint
+from endpoints.check_music_endpoint import check_music
+from endpoints.generate_character_icon_endpoint import generate_character_icon
+from endpoints.generate_character_options_endpoint import generate_character_options
+from endpoints.get_available_models_endpoint import get_available_models
+from endpoints.start_game_endpoint import start_game
+from endpoints.start_new_chapter_endpoint import start_new_chapter
+from endpoints.take_action_endpoint import take_action
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Import endpoints
-from endpoints_logic.start_game_endpoint import start_game
-from endpoints_logic.take_action_endpoint import take_action
-from endpoints import (
-    generate_character_options, 
-    generate_character_icon, 
-    check_music, 
-    get_available_models, 
-    start_new_chapter,
-    generate_tts_endpoint,
-)
 
 app = FastAPI(title="D&D AI Game Backend")
 
@@ -42,19 +40,7 @@ app.add_middleware(
 )
 
 # Register endpoints with logger
-@app.post("/api/generate-character-options")
-async def wrapped_generate_character_options():
-    logger.info("Received request for character options")
-    try:
-        result = await generate_character_options()
-        logger.info(f"Returning character options: {result}")
-        return result
-    except Exception as e:
-        logger.error(f"Error in generate_character_options: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-# Register other endpoints
+app.post("/api/generate-character-options")(generate_character_options)
 app.post("/api/generate-character-icon")(generate_character_icon)
 app.post("/api/start-game")(start_game)
 app.post("/api/take-action")(take_action)

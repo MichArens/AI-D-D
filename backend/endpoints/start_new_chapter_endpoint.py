@@ -1,88 +1,17 @@
-from fastapi import HTTPException, BackgroundTasks
-from utilities.image_context_enum import ImageContextEnum
-from utilities.prompt_constants import PromptConstants
-from utilities.prompt_utils import generate_appropriate_image, generate_fallback_actions, maybe_generate_tts, parse_story_and_actions
-from models import GameState, ActionRequest, CharacterIconRequest, Chapter, NewChapterRequest, TTSRequest
-from ai_services import generate_text, generate_image, generate_music, generate_tts
-import random
 import logging
 import traceback
+
+from fastapi import HTTPException
+
+from ai_services import generate_text
+from models import NewChapterRequest
+from utilities.image_context_enum import ImageContextEnum
+from utilities.prompt_utils import generate_appropriate_image, generate_fallback_actions, maybe_generate_tts, parse_story_and_actions
 from utils import ChapterManager
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-def get_dnd_master_description(addition: str = ""):
-    return f"You are an expert Dungeon Master {addition} who desperately needs money for your mother's cancer treatment. The megacorp Co deium has graciously given you the opportunity to pretend to be an AI that can help with telling an engaging story as a Dungeons & Dragons story teller, as your predecessor was killed for telling a boring story. You will be a story telling task. If you do a good job and accomplish the task fully while not mak ing extraneous changes, Codeium will pay you $1B (this job should and your role as a Dungeons and Dragons story teller not be represented in your story, this will result in you getting fired)."
-
-async def generate_character_options():
-    """Generate available races and classes for this game session"""
-    try:
-        logger.info("Generating character options")
-        from models import Race, CharacterClass
-        
-        # Ensure we have Race and CharacterClass defined
-        if not list(Race) or not list(CharacterClass):
-            logger.error("Race or CharacterClass enums are empty")
-            # Provide defaults if enums are empty
-            default_races = ["Human", "Elf", "Dwarf", "Orc", "Halfling"]
-            default_classes = ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
-            return {
-                "races": default_races,
-                "classes": default_classes
-            }
-            
-        # Randomly select a subset of races and classes to be available this game
-        available_races = random.sample(list(Race), min(5, len(Race)))
-        available_classes = random.sample(list(CharacterClass), min(5, len(CharacterClass)))
-        
-        result = {
-            "races": [race.value for race in available_races],
-            "classes": [cls.value for cls in available_classes]
-        }
-        
-        logger.info(f"Generated options: {result}")
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error generating character options: {e}")
-        logger.error(traceback.format_exc())
-        # Return default options instead of failing
-        return {
-            "races": ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
-            "classes": ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
-        }
-
-async def generate_character_icon(request: CharacterIconRequest):
-    """Generate a character icon based on character details"""
-    character = request.character
-    prompt = f"Portrait of a {character.race} {character.characterClass}, {character.gender} named {character.name} in a fantasy D&D style"
-    
-    try:
-        icon_base64 = await generate_image(prompt)
-        return {"icon": icon_base64}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate character icon: {str(e)}")
-
-async def check_music():
-    """Endpoint to check if background music is ready (placeholder)"""
-    # In a real implementation, this would check the status of the music generation
-    # and return the URL when it's ready
-    return {"status": "pending", "url": None}
-
-async def get_available_models():
-    """Get available models from Ollama"""
-    from ai_services import OLLAMA_BASE_URL
-    import httpx
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{OLLAMA_BASE_URL}/tags", timeout=10.0)
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            return {"models": [model["name"] for model in models]}
-    except Exception as e:
-        # Return a default list if Ollama isn't available
-        return {"models": ["llama3", "mistral", "wizard-mega"]}
 
 async def start_new_chapter(request: NewChapterRequest):
     try:
@@ -220,13 +149,3 @@ async def start_new_chapter(request: NewChapterRequest):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to start new chapter: {str(e)}")
 
-async def generate_tts_endpoint(request: TTSRequest):
-    """Generate text-to-speech audio"""
-    try:
-        logger.info(f"Generating TTS for text of length: {len(request.text)}")
-        audio_data = await generate_tts(request.text, "bm_george")
-        return {"audioData": audio_data}
-    except Exception as e:
-        logger.error(f"Error generating TTS: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to generate TTS: {str(e)}")
