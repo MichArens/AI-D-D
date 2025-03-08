@@ -9,7 +9,6 @@ from endpoints.check_music_endpoint import check_music
 from endpoints.generate_character_icon_endpoint import generate_character_icon
 from endpoints.generate_character_options_endpoint import generate_character_options
 from endpoints.get_available_models_endpoint import get_available_models
-from endpoints.start_game_endpoint import start_game
 from endpoints.start_new_chapter_endpoint import start_new_chapter
 from endpoints.take_action_endpoint import take_action
 
@@ -42,7 +41,6 @@ app.add_middleware(
 # Register endpoints with logger
 app.post("/api/generate-character-options")(generate_character_options)
 app.post("/api/generate-character-icon")(generate_character_icon)
-app.post("/api/start-game")(start_game)
 app.post("/api/take-action")(take_action)
 app.post("/api/start-new-chapter")(start_new_chapter)
 app.get("/api/check-music")(check_music)

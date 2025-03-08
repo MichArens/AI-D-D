@@ -24,7 +24,7 @@ class TakeActionResponse(BaseModel):
     chapterSummary: Optional[str]
     chapterSummaryImage: Optional[str]
     
-async def take_action(request: ActionRequest):
+async def take_action(request: ActionRequest)-> TakeActionResponse:
     """Process a player's action and generate the next story segment"""
     game_state: GameState = request.gameState
     model: str = game_state.settings.aiModel
@@ -33,12 +33,9 @@ async def take_action(request: ActionRequest):
     current_chapter: StoryChapter = current_arc.chapters[-1]
     previous_scene: StoryScene = current_chapter.scenes[-1]
 
-    current_player_index = previous_scene.choosingPlayer.playerIndex
-    # Get the current player and chosen action
-    current_player: PlayerCharacter = game_state.characters[previous_scene.choosingPlayer.playerIndex]
-    
-    # Calculate next player's index
-    next_player_idx: int = (current_player_index + 1) % len(game_state.characters)
+    # Calculate next player
+    prev_player_index = previous_scene.activePlayer.playerIndex
+    next_player_idx: int = (prev_player_index + 1) % len(game_state.characters)
     next_player: PlayerCharacter = game_state.characters[next_player_idx]
     
     # Build chapter context
@@ -56,7 +53,7 @@ async def take_action(request: ActionRequest):
         if _is_chapter_ending(len(current_chapter.scenes), game_state.settings.scenesPerChapter):
             return await _handle_chapter_end(
                 game_state.settings, next_progression_text, model, next_story_part, 
-                current_player, previous_scene.chosenAction,
+                next_player,
                 chapter_story_summary
             )
         else:
@@ -80,60 +77,38 @@ def _is_chapter_ending(scenes_in_chapter: int, scenes_per_chapter: int)-> bool:
     logger.info(f"Chapter length configuration: {scenes_in_chapter}/{scenes_per_chapter} scenes completed")
     return scenes_in_chapter >= scenes_per_chapter
 
-def _get_chosen_action(request: ActionRequest)-> str:
-    """Determine the action chosen by the player"""
-    game_state: GameState = request.gameState
-    choice_id: int = request.choiceId
-    
-    # Check if this is a custom action
-    if request.customAction:
-        chosen_action = request.customAction
-        logger.info(f"Using custom action: {chosen_action}")
-        return chosen_action
-    
-    # Get the action choices and selected action from choices
-    last_story: StoryScene = game_state.arcs[-1].chapters[-1].scenes[-1]
-    logger.debug(f"Last story segment: {last_story.choices} {len(last_story.choices)}")
-    if last_story.choices is None or len(last_story.choices) == 0:
-        raise HTTPException(status_code=400, detail="Invalid game state: missing action choices")
-    
-    if request.choiceId > len(last_story.choices):
-        raise HTTPException(status_code=400, detail=f"Invalid choice ID: {choice_id}")
-    
-    return last_story.choices[choice_id].text
-
 def _build_chapter_context(current_chapter: StoryChapter)-> str:
     """Build narrative context from the current chapter"""
     chapter_story = ""
     logger.debug(f"Building chapter context for {current_chapter.scenes}")
     for scene in current_chapter.scenes:
         chapter_story += f"{scene.text}\n"
-        chapter_story += f"Then {scene.choosingPlayer.name} the {scene.choosingPlayer.race} {scene.choosingPlayer.characterClass} ({scene.choosingPlayer.gender}) chose to: {scene.chosenAction}\n"
+        chapter_story += f"Then {scene.activePlayer.name} the {scene.activePlayer.race} {scene.activePlayer.characterClass} ({scene.activePlayer.gender}) chose to: {scene.chosenAction}\n"
     return chapter_story
 
 def _create_story_prompt(settings: GameSettings, current_arc: StroyArc, current_chapter: StoryChapter, chapter_story_summary: str, next_player: PlayerCharacter):
     """Create the appropriate prompt based on chapter state"""
     should_generate_end_chapter: bool = _is_chapter_ending(len(current_chapter.scenes), settings.scenesPerChapter)
-    current_player: PlayerCharacter = current_chapter.scenes[-1].choosingPlayer
+    previous_player: PlayerCharacter = current_chapter.scenes[-1].activePlayer
     chosen_action: str = current_chapter.scenes[-1].chosenAction
     if not should_generate_end_chapter:
-        return _generate_mid_chapter_prompt(chapter_story_summary, len(current_chapter.scenes), settings.scenesPerChapter, current_player, chosen_action, next_player)
+        return _generate_mid_chapter_prompt(chapter_story_summary, len(current_chapter.scenes), settings.scenesPerChapter, previous_player, chosen_action, next_player)
     
     is_arc_ending: bool = len(current_arc.chapters) >= settings.chaptersPerArc
     logger.info(f"is Arc ending: {is_arc_ending}")
     if is_arc_ending:
-        return _generate_arc_end_prompt(chapter_story_summary, current_player, chosen_action)
+        return _generate_arc_end_prompt(chapter_story_summary, previous_player, chosen_action)
     else:
-        return _generate_chapter_end_prompt(chapter_story_summary, current_player, chosen_action)
+        return _generate_chapter_end_prompt(chapter_story_summary, previous_player, chosen_action)
 
-def _generate_mid_chapter_prompt(chapter_story_summary: str, current_chapter_scene: int, scenes_per_chapter: int, current_player: PlayerCharacter, chosen_action: str, next_player: PlayerCharacter)-> str:
+def _generate_mid_chapter_prompt(chapter_story_summary: str, current_chapter_scene: int, scenes_per_chapter: int, previous_player: PlayerCharacter, chosen_action: str, next_player: PlayerCharacter)-> str:
     return f"""
         {get_dnd_master_description("for an ongoing D&D adventure")}. Continue the story based on the player's choice.
         
         Story so far this chapter:
         {chapter_story_summary}
         
-        Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+        Previous player {previous_player.name} (a {previous_player.race} {previous_player.characterClass}, {previous_player.gender}) chose to: {chosen_action}
         The scene of the story that you need to generate is scene {current_chapter_scene}/{scenes_per_chapter}.
 
         IMPORTANT INSTRUCTIONS:
@@ -155,14 +130,14 @@ def _generate_mid_chapter_prompt(chapter_story_summary: str, current_chapter_sce
         3. [Third action choice for {next_player.name} ONLY]
         """
 
-def _generate_arc_end_prompt(chapter_story_so_far: str, current_player: PlayerCharacter, chosen_action: str)-> str:
+def _generate_arc_end_prompt(chapter_story_so_far: str, previous_player: PlayerCharacter, chosen_action: str)-> str:
     return f"""
         {get_dnd_master_description("for an ongoing D&D adventure")}. This chapter is the final chapter in a story arc.
         
         Story this chapter:
         {chapter_story_so_far}
         
-        Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+        Current player {previous_player.name} (a {previous_player.race} {previous_player.characterClass}, {previous_player.gender}) chose to: {chosen_action}
         
         IMPORTANT CYCLE END INSTRUCTIONS:
         - This is the FINAL CHAPTER in the current story arc, so write a CONCLUSIVE ending.
@@ -180,18 +155,18 @@ def _generate_arc_end_prompt(chapter_story_so_far: str, current_player: PlayerCh
         [New chapter title for a fresh adventure - short and evocative]
         """
 
-def _generate_chapter_end_prompt(chapter_story_so_far: str, current_player: PlayerCharacter, chosen_action: str)-> str:
+def _generate_chapter_end_prompt(chapter_story_so_far: str, previous_player: PlayerCharacter, chosen_action: str)-> str:
     return f"""
         {get_dnd_master_description("for an ongoing D&D adventure")}. The current chapter is ending, but the story arc continues.
         
         Story this chapter:
         {chapter_story_so_far}
         
-        Current player {current_player.name} (a {current_player.race} {current_player.characterClass}, {current_player.gender}) chose to: {chosen_action}
+        Current player {previous_player.name} (a {previous_player.race} {previous_player.characterClass}, {previous_player.gender}) chose to: {chosen_action}
         
         IMPORTANT INSTRUCTIONS:
         - Write a BRIEF, chapter conclusion in 1-2 paragraphs only.
-        - Focus on resolving the immediate situation based on {current_player.name}'s action.
+        - Focus on resolving the immediate situation based on {previous_player.name}'s action.
         - However, leave some unresolved elements for the next chapter to pick up.
         - Create a sense of "to be continued" rather than a complete ending.
         - Then create a title for the next chapter that hints at continuing this storyline.
@@ -210,8 +185,7 @@ async def _handle_chapter_end(
         next_progression_text: str,
         model: str, 
         next_story_part: str, 
-        current_player: PlayerCharacter, 
-        chosen_action: str, 
+        next_player: PlayerCharacter, 
         chapter_story_summary: str
     ):
     next_chapter_title: str = _extract_chapter_title(next_progression_text)
@@ -240,8 +214,8 @@ async def _handle_chapter_end(
         scene=StoryScene(
             text=next_story_part,
             image=image_base64,
-            choosingPlayer=current_player,
-            chosenAction=chosen_action,
+            activePlayer=next_player,
+            chosenAction=None,
             audioData=audio_data,
             choices=[]
         )
@@ -300,7 +274,7 @@ async def _handle_mid_chapter(settings: GameSettings, story_part: str, actions: 
         scene=StoryScene(
             text=story_part,
             image=image_base64,
-            choosingPlayer=next_player,
+            activePlayer=next_player,
             chosenAction=None,
             audioData=audio_data,
             choices=actions

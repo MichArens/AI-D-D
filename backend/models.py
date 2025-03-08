@@ -48,7 +48,7 @@ class StoryScene(BaseModel):
     image: Optional[str] = None
     audioData: Optional[str] = None
     choices: List[ActionChoice] = Field(default_factory=list)
-    choosingPlayer: Optional[PlayerCharacter] = None
+    activePlayer: Optional[PlayerCharacter] = None
     chosenAction: Optional[str] = None
 
 class StoryChapter(BaseModel):
@@ -65,11 +65,3 @@ class GameState(BaseModel):
     characters: List[PlayerCharacter] = Field(default_factory=list)
     arcs: List[StroyArc] = Field(default_factory=list)
     musicUrl: Optional[str] = None
-
-class NewChapterRequest(BaseModel):
-    gameState: GameState
-    nextChapterTitle: str
-    
-    class Config:
-        # Make the model more permissive with extra fields
-        extra = "ignore"
