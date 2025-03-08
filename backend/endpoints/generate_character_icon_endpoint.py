@@ -1,13 +1,20 @@
 import logging
+from typing import Optional
 
 from fastapi import HTTPException
-
+from pydantic import BaseModel
 
 from ai.image_ai_service import generate_image
-from models import CharacterIconRequest, PlayerCharacter
+from models import PlayerCharacter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class CharacterIconRequest(BaseModel):
+    character: PlayerCharacter
+
+class CharacterIconResponse(BaseModel):
+    icon: Optional[str] = None
 
 async def generate_character_icon(request: CharacterIconRequest):
     """Generate a character icon based on character details"""
@@ -16,7 +23,7 @@ async def generate_character_icon(request: CharacterIconRequest):
     
     try:
         icon_base64 = await _generate_character_icon_for_game(prompt)
-        return {"icon": icon_base64}
+        return CharacterIconResponse(icon=icon_base64)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate character icon: {str(e)}")
 

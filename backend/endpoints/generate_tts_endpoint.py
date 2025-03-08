@@ -1,19 +1,28 @@
 import logging
 import traceback
+from typing import Optional
 
 from fastapi import HTTPException
+from pydantic import BaseModel
 from ai.tts_ai_service import generate_tts
-from models import TTSRequest
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def generate_tts_endpoint(request: TTSRequest):
+
+class GenerateTTSRequest(BaseModel):
+    text: str
+    voice: str = "bm_george"  # Default voice
+
+class GenerateTTSResponse(BaseModel):
+    audioData: Optional[str] = None  # Base64 encoded audio
+    
+async def generate_tts_endpoint(request: GenerateTTSRequest):
     """Generate text-to-speech audio"""
     try:
         logger.info(f"Generating TTS for text of length: {len(request.text)}")
         audio_data = await generate_tts(request.text, "bm_george")
-        return {"audioData": audio_data}
+        return GenerateTTSResponse(audioData=audio_data)
     except Exception as e:
         logger.error(f"Error generating TTS: {e}")
         logger.error(traceback.format_exc())

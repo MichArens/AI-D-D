@@ -22,8 +22,6 @@ async def generate_text(prompt: str, model: str = "llama3")-> str:
         if PromptConstants.NEXT_CHAPTER in prompt:
             prompt += "\n\nNote: The NEXT CHAPTER title should be brief (3-7 words) and on its own line."
         
-        logger.info(f"Sending prompt to model {model} (first 100 chars): {prompt[:100]}...")
-        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{OLLAMA_BASE_URL}/generate",
