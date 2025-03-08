@@ -1,6 +1,54 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const CharacterScreen = ({ gameState, setGameState, characterOptions, handleCharacterChange, handleStartGame, loading, error, areCharactersComplete, setScreen }) => {
+  // Function to get a random item from an array
+  const getRandomItem = (array) => {
+    if (!array || array.length === 0) return "";
+    return array[Math.floor(Math.random() * array.length)];
+  };
+
+  // Function to generate random name (simple placeholder)
+  const generateRandomName = () => {
+    const prefixes = ["Ar", "Bel", "Cal", "Dor", "El", "Fae", "Gor", "Hel", "Ir", "Jor", "Kal", "Lum", "Mor", "Nar", "Oth", "Par"];
+    const suffixes = ["ian", "ius", "or", "en", "on", "eth", "wyn", "iel", "and", "ara", "ella", "ira", "one", "ade", "ina", "isa"];
+    return getRandomItem(prefixes) + getRandomItem(suffixes);
+  };
+
+  // Auto-assign random attributes when character options become available
+  useEffect(() => {
+    if (characterOptions?.races?.length && characterOptions?.classes?.length) {
+      // Only proceed if we have options available
+      const updatedCharacters = gameState.characters.map(character => {
+        // Only assign random values for empty fields
+        const updatedCharacter = { ...character };
+        
+        if (!updatedCharacter.race) {
+          updatedCharacter.race = getRandomItem(characterOptions.races);
+        }
+        
+        if (!updatedCharacter.characterClass) {
+          updatedCharacter.characterClass = getRandomItem(characterOptions.classes);
+        }
+        
+        if (!updatedCharacter.gender) {
+          updatedCharacter.gender = getRandomItem(["Male", "Female"]);
+        }
+        
+        if (!updatedCharacter.name || updatedCharacter.name.trim() === '') {
+          updatedCharacter.name = generateRandomName();
+        }
+        
+        return updatedCharacter;
+      });
+      
+      // Update the game state with our randomly generated characters
+      setGameState(prevState => ({
+        ...prevState,
+        characters: updatedCharacters
+      }));
+    }
+  }, [characterOptions, gameState.characters.length]); // Re-run when options change or player count changes
+
   return (
     <div className="character-screen">
       <h1>Character Creation</h1>
