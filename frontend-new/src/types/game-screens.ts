@@ -1,0 +1,1 @@
+export type GameScreens = 'setup' | 'character' | 'game';
