@@ -32,7 +32,8 @@ function App() {
       enableAITTS: false, // Changed from enableTTS to enableAITTS
       enableMusic: false,
       aiModel: 'llama3',
-      roundsPerChapter: 3  // Add default for chapter length
+      scenesPerChapter: 3,  // Add default for chapter length
+      chaptersPerArc: 3     // Add default for chapters per arc
     },
     characters: [],
     storyProgress: [],

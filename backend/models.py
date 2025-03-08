@@ -28,7 +28,8 @@ class GameSettings(BaseModel):
     enableAITTS: bool = False  # Changed from enableTTS to enableAITTS
     enableMusic: bool = False
     aiModel: str = "llama3"
-    roundsPerChapter: int = 3  # Add new setting for chapter length, default to 3
+    scenesPerChapter: int = 3  # Add new setting for chapter length, default to 3
+    chaptersPerArc: int = 3  # Add new setting for arc length, default to 3
 
 class PlayerCharacter(BaseModel):
     name: str
@@ -45,7 +46,6 @@ class Chapter(BaseModel):
     image: Optional[str] = None  # Base64 encoded image
     segments: List[int] = []  # Indices of story segments in this chapter
 
-
 class ActionChoice(BaseModel):
     id: int
     text: str
@@ -58,6 +58,20 @@ class StoryProgression(BaseModel):
     chapterId: int
     audioData: Optional[str] = None
     choices: List[ActionChoice] = []
+
+class StoryScene(BaseModel):
+    text: str
+    image: Optional[str] = None
+    choices: List[ActionChoice] = Field(default_factory=list)
+
+class StoryChapter(BaseModel):
+    title: str
+    summary: Optional[str] = None
+    summaryImage: Optional[str] = None
+    scenes: List[StoryScene]
+
+class StroyArc(BaseModel):
+    chapters: List[Chapter]
 
 class GameState(BaseModel):
     settings: GameSettings

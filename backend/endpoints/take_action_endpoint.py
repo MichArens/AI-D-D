@@ -34,7 +34,7 @@ async def take_action(request: ActionRequest):
     current_chapter: Chapter = game_state.chapters[current_chapter_idx]
     
     rounds_in_chapter: int = game_state.roundsInCurrentChapter + 1
-    should_generate_end_chapter: bool = _is_chapter_ending(rounds_in_chapter, game_state.settings.roundsPerChapter)
+    should_generate_end_chapter: bool = _is_chapter_ending(rounds_in_chapter, game_state.settings.scenesPerChapter)
     
     # Build chapter context
     chapter_story_so_far = _build_chapter_context(current_chapter, game_state.storyProgress)

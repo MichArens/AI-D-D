@@ -29,12 +29,12 @@ const SetupScreen = ({
     if (value === 'custom') {
       setCustomChapterLength(true);
       // Keep the current value or default to 3
-      const currentValue = gameState.settings?.roundsPerChapter || 3;
+      const currentValue = gameState.settings?.scenesPerChapter || 3;
       setCustomLengthValue(currentValue);
     } else {
       setCustomChapterLength(false);
       // Convert value to integer and update game state
-      handleSettingsChange('roundsPerChapter', parseInt(value));
+      handleSettingsChange('scenesPerChapter', parseInt(value));
     }
   };
   
@@ -48,7 +48,7 @@ const SetupScreen = ({
     if (value > 20) value = 20;
     
     setCustomLengthValue(value);
-    handleSettingsChange('roundsPerChapter', value);
+    handleSettingsChange('scenesPerChapter', value);
   };
 
   return (
@@ -75,9 +75,9 @@ const SetupScreen = ({
           </div>
           
           <div className="form-group">
-            <label>Chapter Length:</label>
+            <label>Scenes per Chapter:</label>
             <select 
-              value={customChapterLength ? 'custom' : (gameState.settings?.roundsPerChapter || 3)} 
+              value={customChapterLength ? 'custom' : (gameState.settings?.scenesPerChapter || 3)} 
               onChange={handleChapterLengthChange}
             >
               <option value="1">1 Round (Very Short)</option>
@@ -105,6 +105,23 @@ const SetupScreen = ({
             
             <div className="setting-description">
               Controls how many player actions occur in each chapter
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label>Chapters per Arc:</label>
+            <select 
+              value={gameState.settings?.chaptersPerArc || 3} 
+              onChange={(e) => handleSettingsChange('chaptersPerArc', parseInt(e.target.value))}
+            >
+              <option value="1">1 Chapter (Very Short)</option>
+              <option value="3">3 Chapters (Short)</option>
+              <option value="5">5 Chapters (Medium)</option>
+              <option value="7">7 Chapters (Long)</option>
+              <option value="10">10 Chapters (Epic)</option>
+            </select>
+            <div className="setting-description">
+              Controls how many chapters make up a complete story arc
             </div>
           </div>
           
