@@ -10,9 +10,9 @@ export interface IGameSettings {
 
 export  interface IPlayerCharacter {
     name: string;
-    race: string;
-    characterClass: string;
-    gender: string;
+    race?: string;
+    characterClass?: string;
+    gender?: string;
     playerIndex: number;
     icon?: string;  // Base64 encoded image
 }

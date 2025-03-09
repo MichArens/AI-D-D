@@ -6,7 +6,6 @@ import { IGameState } from '../types/game-types';
 interface SetupScreenProps {
   gameState: IGameState;
   setGameState: React.Dispatch<React.SetStateAction<IGameState>>;
-  handleStartSetup: () => void;
   loading: boolean;
   error: any;
   setScreen: React.Dispatch<React.SetStateAction<GameScreens>>;
@@ -15,7 +14,6 @@ interface SetupScreenProps {
 const SetupScreen: React.FC<SetupScreenProps> = ({
   gameState,
   setGameState,
-  handleStartSetup,
   loading,
   error,
   setScreen,
@@ -81,7 +79,6 @@ const SetupScreen: React.FC<SetupScreenProps> = ({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        handleStartSetup();
         setScreen('character');
     };
 
@@ -214,7 +211,7 @@ const SetupScreen: React.FC<SetupScreenProps> = ({
             <div className="actions">
             <button 
                 className="main-button" 
-                onClick={handleStartSetup}
+                onClick={handleSubmit}
                 disabled={loading}
             >
                 {loading ? 'Loading...' : 'Continue to Character Creation'}

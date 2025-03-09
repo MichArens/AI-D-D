@@ -1,3 +1,5 @@
+import { IGameState, IPlayerCharacter } from "../types/game-types";
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // Improve error handling in API calls
@@ -53,40 +55,40 @@ const callApi = async (endpoint: string, method: string = 'GET', body: any = nul
 };
 
 export const api = {
-//   async getCharacterOptions() {
-//     try {
-//       console.log('[API] Getting character options');
-//       // Handle potential empty response
-//       const data = await callApi('generate-character-options', 'POST');
-//       if (!data || (!data.races && !data.classes)) {
-//         console.warn('[API] Received empty character options, using defaults');
-//         return {
-//           races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
-//           classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
-//         };
-//       }
-//       return data;
-//     } catch (error) {
-//       console.error('[API] Failed to get character options:', error);
-//       // Return default options on error
-//       return {
-//         races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
-//         classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
-//       };
-//     }
-//   },
+  async getCharacterOptions() {
+    try {
+      console.log('[API] Getting character options');
+      // Handle potential empty response
+      const data = await callApi('generate-character-options', 'POST');
+      if (!data || (!data.races && !data.classes)) {
+        console.warn('[API] Received empty character options, using defaults');
+        return {
+          races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+          classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+        };
+      }
+      return data;
+    } catch (error) {
+      console.error('[API] Failed to get character options:', error);
+      // Return default options on error
+      return {
+        races: ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+        classes: ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+      };
+    }
+  },
   
-//   async generateCharacterIcon(character) {
-//     return callApi('generate-character-icon', 'POST', { character });
-//   },
+  async generateCharacterIcon(character: IPlayerCharacter) {
+    return callApi('generate-character-icon', 'POST', { character });
+  },
   
-//   async startGame(gameState) {
-//     return callApi('start-game', 'POST', gameState);
-//   },
+  async startGame(gameState: IGameState) {
+    return callApi('start-game', 'POST', gameState);
+  },
   
-//   async takeAction(gameState, choiceId, customAction = null) {
-//     return callApi('take-action', 'POST', { gameState, choiceId, customAction });
-//   },
+  async takeAction(gameState: IGameState, choiceId: number, customAction = null) {
+    return callApi('take-action', 'POST', { gameState, choiceId, customAction });
+  },
   
   async getModels() {
     return callApi('models');

@@ -2,7 +2,9 @@ import React from 'react';
 import './App.css';
 import { GameScreens } from './types/game-screens';
 import SetupScreen from './screens/SetupScreen';
-import { IGameState } from './types/game-types';
+import { IGameState, IPlayerCharacter } from './types/game-types';
+import { api } from './utils/api-service';
+import CharacterScreen from './screens/CharacterScreen';
 
 function App() {
   const [screen, setScreen] = React.useState<GameScreens>('setup');
@@ -22,36 +24,24 @@ function App() {
       }
   ],
   });
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
-
-  // Functions
-  const handleStartSetup = () => {
-    // Implementation goes here
-  };
+  const [loading, setLoading] = React.useState<boolean>(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   return (
       <div className={`dnd-app ${screen === 'game' ? 'dnd-app-fullscreen' : ''}`}>
         {screen === 'setup' && <SetupScreen 
           gameState={gameState} 
           setGameState={setGameState} 
-          handleStartSetup={handleStartSetup} 
           loading={loading} 
           error={error} 
           setScreen={setScreen} 
         />}
-        {/* {screen === 'character' && <CharacterScreen 
+        {screen === 'character' && <CharacterScreen 
           gameState={gameState} 
           setGameState={setGameState} 
-          characterOptions={characterOptions} 
-          handleCharacterChange={handleCharacterChange} 
-          handleStartGame={handleStartGame} 
-          loading={loading} 
-          error={error} 
-          areCharactersComplete={areCharactersComplete} 
           setScreen={setScreen} 
         />}
-        {screen === 'game' && <GameScreen 
+        {/* {screen === 'game' && <GameScreen 
           gameState={gameState} 
           setGameState={setGameState} 
           handleActionChoice={handleActionChoice} 
