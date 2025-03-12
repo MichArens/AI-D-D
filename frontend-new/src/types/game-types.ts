@@ -1,11 +1,11 @@
 export interface IGameSettings {
     playerCount: number;
-    enableImages?: boolean;
-    enableAITTS?: boolean;  // Changed from enableTTS to enableAITTS
-    enableMusic?: boolean;
+    enableImages: boolean;
+    enableAITTS: boolean;  // Changed from enableTTS to enableAITTS
+    enableMusic: boolean;
     aiModel?: string;
-    scenesPerChapter?: number;
-    chaptersPerArc?: number;
+    scenesPerChapter: number;
+    chaptersPerArc: number;
 }
 
 export  interface IPlayerCharacter {
@@ -27,7 +27,7 @@ export  interface IStoryScene {
     image?: string;
     audioData?: string;
     choices: IActionChoice[];
-    activePlayer?: IPlayerCharacter;
+    activeCharacterIndex: number;
     chosenAction?: string;
 }
 
@@ -36,6 +36,7 @@ export  interface IStoryChapter {
     summary?: string;
     summaryImage?: string;
     scenes: IStoryScene[];
+    index: number;
 }
 
 export  interface IStoryArc {  // Fixed typo from "StroyArc" to "StoryArc"

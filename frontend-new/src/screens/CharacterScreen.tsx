@@ -1,17 +1,19 @@
 import React, { use, useEffect, useState } from 'react';
 import { GameScreens } from '../types/game-screens';
 import { api } from '../utils/api-service';
-import { IGameState, IPlayerCharacter } from '../types/game-types';
+import { IGameState, IPlayerCharacter, IStoryChapter } from '../types/game-types';
 
 interface CharacterScreenProps {
   gameState: IGameState;
-  setGameState: React.Dispatch<React.SetStateAction<IGameState>>;
+  updateCharacters: (newCharacters: IPlayerCharacter[]) => void;
+  addNewChapter: (newChapter: IStoryChapter) => void;
   setScreen: React.Dispatch<React.SetStateAction<GameScreens>>;
 }
 
 const CharacterScreen: React.FC<CharacterScreenProps> = ({
   gameState,
-  setGameState,
+  updateCharacters,
+  addNewChapter,
   setScreen,
 }) => {
     const [error, setError] = useState<string | null>(null);
@@ -50,10 +52,7 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
                 icon: undefined
                 }));
                 
-                setGameState(prev => ({
-                ...prev,
-                characters: initialCharacters
-                }));
+              updateCharacters(initialCharacters);
             } catch (err: any) {
                 console.error('Failed to initialize character creation:', err);
                 setError(`Failed to initialize character creation: ${err.message || 'Unknown error'}`);
@@ -105,10 +104,7 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
           });
           
           // Update the game state with our randomly generated characters
-          setGameState(prevState => ({
-            ...prevState,
-            characters: updatedCharacters
-          }));
+          updateCharacters(updatedCharacters);
         }
     }, [characterOptions, gameState.characters.length]);
 
@@ -119,11 +115,44 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
     };
 
     const handleCharacterChange = (index: number, field: string, value: any) => {
-        setGameState(prev => {
-          const newCharacters = [...prev.characters];
-          newCharacters[index] = { ...newCharacters[index], [field]: value };
-          return { ...prev, characters: newCharacters };
-        });
+        const newCharacters = [...gameState.characters];
+        newCharacters[index] = { ...newCharacters[index], [field]: value };
+        updateCharacters(newCharacters);
+    };
+
+    const handleStartGame = async () => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+          // Generate icons for all characters if images are enabled
+          const updatedCharacters = [...gameState.characters];
+          if (gameState.settings.enableImages) {
+            for (let i = 0; i < updatedCharacters.length; i++) {
+              const character = updatedCharacters[i];
+              const { icon } = await api.generateCharacterIcon(character);
+              updatedCharacters[i] = { ...character, icon };
+            }
+          }
+          
+
+          // Start the game with the first chapter
+          const response = await api.startNewChapter(gameState);
+          
+          if (!response || !response.newChapter) {
+            throw new Error("Invalid response from server when starting game");
+          }
+          
+          const newChapter = response.newChapter;
+          addNewChapter(newChapter);
+          console.log("Start game finish ", gameState);
+          setScreen('game');
+        } catch (err: any) {
+          console.error("Start game error:", err);
+          setError('Failed to start game. Please try again. ' + err.message);
+        } finally {
+          setLoading(false);
+        }
     };
 
     return (
@@ -196,7 +225,7 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
             </button>
             <button 
               className="main-button" 
-              onClick={undefined}
+              onClick={handleStartGame}
               disabled={loading || !areCharactersComplete()}
             >
               {loading ? 'Creating Adventure...' : 'Start Adventure!'}

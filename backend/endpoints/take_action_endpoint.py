@@ -20,7 +20,7 @@ class ActionRequest(BaseModel):
 
 class TakeActionResponse(BaseModel):
     scene: StoryScene
-    next_chapter_title: Optional[str]
+    nextChapterTitle: Optional[str]
     chapterSummary: Optional[str]
     chapterSummaryImage: Optional[str]
     
@@ -34,15 +34,14 @@ async def take_action(request: ActionRequest)-> TakeActionResponse:
     previous_scene: StoryScene = current_chapter.scenes[-1]
 
     # Calculate next player
-    prev_player_index = previous_scene.activePlayer.playerIndex
+    prev_player_index = previous_scene.activeCharacterIndex
     next_player_idx: int = (prev_player_index + 1) % len(game_state.characters)
-    next_player: PlayerCharacter = game_state.characters[next_player_idx]
     
     # Build chapter context
-    chapter_story_summary: str = _build_chapter_context(current_chapter)
+    chapter_story_summary: str = _build_chapter_context(current_chapter, game_state.characters)
  
     # Create prompt based on chapter state
-    prompt: str = _create_story_prompt(request.gameState.settings, current_arc, current_chapter, chapter_story_summary, next_player)
+    prompt: str = _create_story_prompt(request.gameState.settings, request.gameState.characters, current_arc, current_chapter, chapter_story_summary, next_player_idx)
     
     try:
         # Generate AI response
@@ -53,18 +52,18 @@ async def take_action(request: ActionRequest)-> TakeActionResponse:
         if _is_chapter_ending(len(current_chapter.scenes), game_state.settings.scenesPerChapter):
             return await _handle_chapter_end(
                 game_state.settings, next_progression_text, model, next_story_part, 
-                next_player,
+                next_player_idx,
                 chapter_story_summary
             )
         else:
             if not next_story_part or len(next_actions) < 3:
                 logger.warning(f"Insufficient content parsed from AI response: story={bool(next_story_part)}, actions={len(next_actions)}")
                 next_story_part = next_story_part or next_progression_text
-                next_actions = generate_fallback_actions(next_player.name)
+                next_actions = generate_fallback_actions(game_state.characters[next_player_idx].name)
             
             return await _handle_mid_chapter(
                 game_state.settings, next_story_part, next_actions,
-                next_player
+                next_player_idx
             )
     
     except Exception as e:
@@ -77,19 +76,22 @@ def _is_chapter_ending(scenes_in_chapter: int, scenes_per_chapter: int)-> bool:
     logger.info(f"Chapter length configuration: {scenes_in_chapter}/{scenes_per_chapter} scenes completed")
     return scenes_in_chapter >= scenes_per_chapter
 
-def _build_chapter_context(current_chapter: StoryChapter)-> str:
+def _build_chapter_context(current_chapter: StoryChapter, characters: List[PlayerCharacter])-> str:
     """Build narrative context from the current chapter"""
     chapter_story = ""
     logger.debug(f"Building chapter context for {current_chapter.scenes}")
     for scene in current_chapter.scenes:
+        active_character: PlayerCharacter = characters[scene.activeCharacterIndex]
         chapter_story += f"{scene.text}\n"
-        chapter_story += f"Then {scene.activePlayer.name} the {scene.activePlayer.race} {scene.activePlayer.characterClass} ({scene.activePlayer.gender}) chose to: {scene.chosenAction}\n"
+        chapter_story += f"Then {active_character.name} the {active_character.race} {active_character.characterClass} ({active_character.gender}) chose to: {scene.chosenAction}\n"
     return chapter_story
 
-def _create_story_prompt(settings: GameSettings, current_arc: StroyArc, current_chapter: StoryChapter, chapter_story_summary: str, next_player: PlayerCharacter):
+def _create_story_prompt(settings: GameSettings, characters: List[PlayerCharacter], current_arc: StroyArc, current_chapter: StoryChapter, chapter_story_summary: str, next_player_index: int):
     """Create the appropriate prompt based on chapter state"""
     should_generate_end_chapter: bool = _is_chapter_ending(len(current_chapter.scenes), settings.scenesPerChapter)
-    previous_player: PlayerCharacter = current_chapter.scenes[-1].activePlayer
+    previous_player_index: int = current_chapter.scenes[-1].activeCharacterIndex
+    previous_player: PlayerCharacter = characters[previous_player_index]
+    next_player: PlayerCharacter = characters[next_player_index]
     chosen_action: str = current_chapter.scenes[-1].chosenAction
     if not should_generate_end_chapter:
         return _generate_mid_chapter_prompt(chapter_story_summary, len(current_chapter.scenes), settings.scenesPerChapter, previous_player, chosen_action, next_player)
@@ -130,7 +132,7 @@ def _generate_mid_chapter_prompt(chapter_story_summary: str, current_chapter_sce
         3. [Third action choice for {next_player.name} ONLY]
         """
 
-def _generate_arc_end_prompt(chapter_story_so_far: str, previous_player: PlayerCharacter, chosen_action: str)-> str:
+def _generate_arc_end_prompt(chapter_story_so_far: str, previous_player: int, chosen_action: str)-> str:
     return f"""
         {get_dnd_master_description("for an ongoing D&D adventure")}. This chapter is the final chapter in a story arc.
         
@@ -155,7 +157,7 @@ def _generate_arc_end_prompt(chapter_story_so_far: str, previous_player: PlayerC
         [New chapter title for a fresh adventure - short and evocative]
         """
 
-def _generate_chapter_end_prompt(chapter_story_so_far: str, previous_player: PlayerCharacter, chosen_action: str)-> str:
+def _generate_chapter_end_prompt(chapter_story_so_far: str, previous_player: int, chosen_action: str)-> str:
     return f"""
         {get_dnd_master_description("for an ongoing D&D adventure")}. The current chapter is ending, but the story arc continues.
         
@@ -185,7 +187,7 @@ async def _handle_chapter_end(
         next_progression_text: str,
         model: str, 
         next_story_part: str, 
-        next_player: PlayerCharacter, 
+        next_player_index: int, 
         chapter_story_summary: str
     ):
     next_chapter_title: str = _extract_chapter_title(next_progression_text)
@@ -208,13 +210,13 @@ async def _handle_chapter_end(
     audio_data: Optional[str] = await maybe_generate_tts(next_story_part, settings.enableAITTS)
     
     response = TakeActionResponse(
-        next_chapter_title=next_chapter_title,
+        nextChapterTitle=next_chapter_title,
         chapterSummary=short_chapter_summary,
         chapterSummaryImage=chapter_summary_image,
         scene=StoryScene(
             text=next_story_part,
             image=image_base64,
-            activePlayer=next_player,
+            activeCharacterIndex=next_player_index,
             chosenAction=None,
             audioData=audio_data,
             choices=[]
@@ -259,7 +261,7 @@ def _extract_chapter_title(response_text)-> Union[str, Literal["The Next Chapter
     
     return next_chapter_title
 
-async def _handle_mid_chapter(settings: GameSettings, story_part: str, actions: List[str], next_player: PlayerCharacter):
+async def _handle_mid_chapter(settings: GameSettings, story_part: str, actions: List[str], next_player_index: int):
     """Handle mid-chapter story continuation"""
 
     image_base64 = await generate_appropriate_image(
@@ -274,12 +276,12 @@ async def _handle_mid_chapter(settings: GameSettings, story_part: str, actions: 
         scene=StoryScene(
             text=story_part,
             image=image_base64,
-            activePlayer=next_player,
+            activeCharacterIndex=next_player_index,
             chosenAction=None,
             audioData=audio_data,
             choices=actions
         ),
-        next_chapter_title=None,
+        nextChapterTitle=None,
         chapterSummary=None,
         chapterSummaryImage=None
     )

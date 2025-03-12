@@ -1,4 +1,4 @@
-import { IGameState, IPlayerCharacter } from "../types/game-types";
+import { IGameState, IPlayerCharacter, IStoryChapter, IStoryScene } from "../types/game-types";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
@@ -55,7 +55,7 @@ const callApi = async (endpoint: string, method: string = 'GET', body: any = nul
 };
 
 export const api = {
-  async getCharacterOptions() {
+  async getCharacterOptions(): Promise<{races: string[], classes: string[]}> {
     try {
       console.log('[API] Getting character options');
       // Handle potential empty response
@@ -78,45 +78,41 @@ export const api = {
     }
   },
   
-  async generateCharacterIcon(character: IPlayerCharacter) {
+  async generateCharacterIcon(character: IPlayerCharacter): Promise<{icon: string}> {
     return callApi('generate-character-icon', 'POST', { character });
   },
-  
-  async startGame(gameState: IGameState) {
-    return callApi('start-game', 'POST', gameState);
+
+  async takeAction(gameState: IGameState, customAction?: string): Promise<{scene: IStoryScene, nextChapterTitle?: string, chapterSummary?: string, chapterSummaryImage?: string}> {
+    return callApi('take-action', 'POST', { gameState, customAction });
   },
   
-  async takeAction(gameState: IGameState, choiceId: number, customAction = null) {
-    return callApi('take-action', 'POST', { gameState, choiceId, customAction });
-  },
-  
-  async getModels() {
+  async getModels(): Promise<{models: string[]}> {
     return callApi('models');
   },
   
-//   async startNewChapter(gameState, nextChapterTitle) {
-//     try {
-//       // Clean up gameState to make it more compatible with backend
-//       const cleanGameState = JSON.parse(JSON.stringify(gameState));
+  async startNewChapter(gameState: IGameState, nextChapterTitle?: string): Promise<{newChapter: IStoryChapter}> {
+    try {
+      // Clean up gameState to make it more compatible with backend
+      const cleanGameState = JSON.parse(JSON.stringify(gameState));
       
-//       // Make sure data matches the expected format for Pydantic model
-//       const requestData = {
-//         gameState: cleanGameState,
-//         nextChapterTitle: nextChapterTitle || "The Next Chapter"
-//       };
+      // Make sure data matches the expected format for Pydantic model
+      const requestData = {
+        gameState: cleanGameState,
+        nextChapterTitle: nextChapterTitle 
+      };
       
-//       return await callApi('start-new-chapter', 'POST', requestData);
-//     } catch (error) {
-//       console.error('[API] Failed to start new chapter:', error);
-//       throw error;
-//     }
-//   },
+      return await callApi('start-new-chapter', 'POST', requestData);
+    } catch (error) {
+      console.error('[API] Failed to start new chapter:', error);
+      throw error;
+    }
+  },
   
-//   async checkMusic() {
-//     return callApi('check-music', 'GET');
-//   },
+  async checkMusic() {
+    return callApi('check-music', 'GET');
+  },
   
-//   async generateTTS(text, voice = 'bm_george') {
-//     return callApi('generate-tts', 'POST', { text, voice });
-//   }
+  async generateTTS(text: string, voice = 'bm_george'): Promise<string> {
+    return callApi('generate-tts', 'POST', { text, voice });
+  }
 };

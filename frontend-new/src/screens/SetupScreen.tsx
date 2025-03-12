@@ -1,36 +1,31 @@
 import React, { use, useEffect, useState } from 'react';
 import { GameScreens } from '../types/game-screens';
 import { api } from '../utils/api-service';
-import { IGameState } from '../types/game-types';
+import { IGameSettings, IGameState } from '../types/game-types';
 
 interface SetupScreenProps {
   gameState: IGameState;
-  setGameState: React.Dispatch<React.SetStateAction<IGameState>>;
-  loading: boolean;
-  error: any;
+  updateSettings: (newSettings: IGameSettings) => void;
   setScreen: React.Dispatch<React.SetStateAction<GameScreens>>;
 }
 
 const SetupScreen: React.FC<SetupScreenProps> = ({
   gameState,
-  setGameState,
-  loading,
-  error,
+  updateSettings,
   setScreen,
 }) => {
     const [customChapterLength, setCustomChapterLength] = useState(false);
     const [customLengthValue, setCustomLengthValue] = useState(3);
     const [availableModels, setAvailableModels] = useState(['llama3']);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState<boolean>(false);
 
     useEffect(() => {
         async function loadModels() {
             try {
               const { models } = await api.getModels();
               setAvailableModels(models);
-              setGameState(prev => ({
-                ...prev,
-                settings: { ...prev.settings, aiModel: models[0] }
-              }));
+              updateSettings({ ...gameState.settings, aiModel: models[0] });
             } catch (err) {
               console.error('Failed to load models:', err);
             }
@@ -40,13 +35,7 @@ const SetupScreen: React.FC<SetupScreenProps> = ({
     }, []);
 
     const handleSettingChange = (settingName: string, value: any) => {
-        setGameState((prev) => ({
-        ...prev,
-        settings: {
-            ...prev.settings,
-            [settingName]: value,
-        },
-        }));
+        updateSettings({ ...gameState.settings, [settingName]: value });
     };
 
     const handleChapterLengthChange = (e: any) => {
@@ -78,6 +67,7 @@ const SetupScreen: React.FC<SetupScreenProps> = ({
     };
 
     const handleSubmit = (e: React.FormEvent) => {
+        setLoading(true);
         e.preventDefault();
         setScreen('character');
     };

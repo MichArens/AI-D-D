@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class NewChapterRequest(BaseModel):
     gameState: GameState
+    newChapterTitle: Optional[str] = None
     
     class Config:
         # Make the model more permissive with extra fields
@@ -29,26 +30,27 @@ class NewChapterResponse(BaseModel):
 async def start_new_chapter(request: NewChapterRequest)-> NewChapterResponse:
     try:
         is_game_start: bool = len(request.gameState.arcs[-1].chapters) == 0
-        is_arc_start: bool = is_game_start or len(request.gameState.arcs[-1].chapters) == 1
-        next_player: PlayerCharacter = request.gameState.characters[0] if is_game_start else request.gameState.arcs[-1].chapters[-2].scenes[-1].activePlayer
+        is_arc_start: bool = is_game_start or len(request.gameState.arcs[-1].chapters) == request.gameState.settings.chaptersPerArc
+        next_player_index: int = 0 if is_game_start else request.gameState.arcs[-1].chapters[-1].scenes[-1].activeCharacterIndex
+        next_chapter_index: int = 0 if is_game_start else request.gameState.arcs[-1].chapters[-1].index + 1
         logger.info(f"Starting new chapter is game start: {is_game_start}, is arc start: {is_arc_start}")
         if is_arc_start:
             generated_chapter_title: Optional[str] = None if is_game_start else request.gameState.arcs[-1].chapters[-1].title
-            return await _create_arc_start_chapter(request.gameState.settings, request.gameState.characters, next_player, generated_chapter_title)
+            return await _create_arc_start_chapter(request.gameState.settings, request.gameState.characters, next_player_index, next_chapter_index, generated_chapter_title)
 
-        return await _create_mid_arc_chapter(request.gameState.settings, request.gameState.arcs[-1], request.gameState.characters, next_player, request.gameState.arcs[-1].chapters[-1].title)
+        return await _create_mid_arc_chapter(request.gameState.settings, request.gameState.arcs[-1], request.gameState.characters, next_player_index, next_chapter_index, request.gameState.arcs[-1].chapters[-1].title)
     except Exception as e:
         logger.error(f"Error in start_new_chapter: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to start new chapter: {str(e)}")
 
-async def _create_arc_start_chapter(settings: GameSettings, characters: List[PlayerCharacter], next_player: PlayerCharacter, generated_chapter_title: Optional[str] = None):
+async def _create_arc_start_chapter(settings: GameSettings, characters: List[int], next_player_index: int, next_chapter_index: int, generated_chapter_title: Optional[str] = None):
     party_description: str = _create_party_description(characters)
     chapter_title: str = generated_chapter_title
     if not chapter_title:
         chapter_title = await _create_chapter_title(settings.aiModel, party_description)
  
-    initial_story_prompt = _create_initial_story_prompt(next_player, party_description, chapter_title)
+    initial_story_prompt = _create_initial_story_prompt(characters[next_player_index], party_description, chapter_title)
     initial_story_text = await generate_text(initial_story_prompt, settings.aiModel)
     
     initial_story_part, initial_story_actions = parse_story_and_actions(initial_story_text)
@@ -75,7 +77,7 @@ async def _create_arc_start_chapter(settings: GameSettings, characters: List[Pla
         image=image_base64,
         choices=initial_story_actions,
         audioData=audio_data,
-        activePlayer=next_player,
+        activeCharacterIndex=next_player_index,
         chosenAction=None
     )
     
@@ -84,7 +86,8 @@ async def _create_arc_start_chapter(settings: GameSettings, characters: List[Pla
             title=chapter_title,
             summary=None,
             summaryImage=None,
-            scenes=[initial_scene]
+            scenes=[initial_scene],
+            index=next_chapter_index
         )
     )
 
@@ -134,9 +137,9 @@ def _create_initial_story_prompt(first_character: PlayerCharacter, party_descrip
         3. [Third action choice for {first_character.name} ONLY]
         """
 
-async def _create_mid_arc_chapter(settings: GameSettings, current_arc: StroyArc, characters: List[PlayerCharacter], next_player: PlayerCharacter, generated_chapter_title: str):
+async def _create_mid_arc_chapter(settings: GameSettings, current_arc: StroyArc, characters: List[PlayerCharacter], next_player_index: int, next_chapter_index: int, generated_chapter_title: str):
     party_description: str = _create_party_description(characters)
-    mid_chapter_prompt: str = _create_mid_arc_new_chapter_prompt(current_arc, party_description, next_player, generated_chapter_title)
+    mid_chapter_prompt: str = _create_mid_arc_new_chapter_prompt(current_arc, party_description, characters[next_player_index], generated_chapter_title)
     logger.info(f"Mid Chapter Prompt: {mid_chapter_prompt}")
     response_text = await generate_text(mid_chapter_prompt, settings.aiModel)
     logger.info(f"Mid Chapter Prompt Response: {response_text}")
@@ -162,14 +165,15 @@ async def _create_mid_arc_chapter(settings: GameSettings, current_arc: StroyArc,
         image=image_base64,
         choices=actions,
         audioData=audio_data,
-        activePlayer=next_player,
+        activeCharacterIndex=next_player_index,
         chosenAction=None
     )
     
     return NewChapterResponse(
             newChapter=StoryChapter(
             title=generated_chapter_title,
-            scenes=[initial_scene]
+            scenes=[initial_scene],
+            index=next_chapter_index
         )
     )
 
@@ -180,7 +184,7 @@ def _create_mid_arc_new_chapter_prompt(current_arc: StroyArc, party_description:
         
         The party consists of: {party_description}
         
-        {_create_continuity_prompt(_create_current_arc_summary(current_arc), current_arc.chapters[-2].scenes[-1].text, None, None, generated_chapter_title)}
+        {_create_continuity_prompt(_create_current_arc_summary(current_arc), current_arc.chapters[-1].scenes[-1].text, None, None, generated_chapter_title)}
         
         Then, provide exactly 3 possible actions that ONLY {next_player.name} could take 
         in direct response to the situation that was unfolding at the end of the previous chapter.

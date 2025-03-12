@@ -48,7 +48,7 @@ class StoryScene(BaseModel):
     image: Optional[str] = None
     audioData: Optional[str] = None
     choices: List[ActionChoice] = Field(default_factory=list)
-    activePlayer: Optional[PlayerCharacter] = None
+    activeCharacterIndex: Optional[int] = None
     chosenAction: Optional[str] = None
 
 class StoryChapter(BaseModel):
@@ -56,6 +56,7 @@ class StoryChapter(BaseModel):
     summary: Optional[str] = None
     summaryImage: Optional[str] = None
     scenes: List[StoryScene]
+    index: int
 
 class StroyArc(BaseModel):
     chapters: List[StoryChapter]
