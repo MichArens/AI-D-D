@@ -5,3 +5,4 @@ python-multipart==0.0.6
 pydantic==2.3.0
 kokoro==0.8.4
 soundfile
+websockets

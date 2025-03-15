@@ -104,10 +104,14 @@ button:disabled {
   background-color: var(--gray-dark);
   color: var(--off-white);
   border: 1px solid var(--gray-light);
+  font-size: 1rem; /* Added to match main-button */
+  padding: 12px 20px; /* Added for better sizing */
 }
 
 .secondary-button:hover:not(:disabled) {
   background-color: #555;
+  transform: translateY(-2px); /* Added for hover effect consistency */
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2); /* Added for hover effect */
 }
 
 .error-message {
@@ -217,6 +221,7 @@ button:disabled {
   display: flex;
   justify-content: center;
   gap: 20px;
+  margin-top: 30px; /* Added for better spacing */
 }
 
 /* Add new style for setting description */
@@ -1007,6 +1012,49 @@ button:disabled {
   color: var(--primary-dark);
   font-family: var(--body-font);
   font-size: 1rem;
+}
+
+/* Join Game Screen */
+.join-game-screen {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.join-form {
+  background-color: rgba(26, 10, 10, 0.8);
+  border: 2px solid var(--primary-red);
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.code-input-container {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 30px 0;
+}
+
+.code-input {
+  width: 60px;
+  height: 80px;
+  font-size: 2.5rem;
+  text-align: center;
+  background-color: var(--parchment);
+  color: var(--primary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 8px;
+  font-family: var(--body-font);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.code-input:focus {
+  outline: none;
+  border-color: var(--primary-red);
+  box-shadow: 0 0 10px rgba(139, 0, 0, 0.5);
 }
 
 /* Media Queries */

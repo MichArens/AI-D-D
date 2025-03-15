@@ -1,1 +1,1 @@
-export type GameScreens = 'setup' | 'character' | 'game';
+export type GameScreens = 'setup' | 'character' | 'game' | 'join';

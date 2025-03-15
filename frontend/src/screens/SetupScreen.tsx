@@ -206,6 +206,14 @@ const SetupScreen: React.FC<SetupScreenProps> = ({
             >
                 {loading ? 'Loading...' : 'Continue to Character Creation'}
             </button>
+            
+            <button 
+                className="secondary-button" 
+                disabled={loading}
+                onClick={() => setScreen('join')}
+            >
+                Join Existing Session
+            </button>
             </div>
         </div>
         
