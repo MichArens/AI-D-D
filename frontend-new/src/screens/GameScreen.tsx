@@ -58,6 +58,18 @@ const GameScreen: React.FC<GameScreenProps> = ({
     const isViewingPastChapter: boolean = useMemo(() => {
         return viewingChapterIndex < getCurrentChapter().index;
     }, [gameState, viewingChapterIndex]);
+    
+    const scrollToBottom = useCallback(() => {
+        if (storyRef.current) {
+            storyRef.current.scrollTop = storyRef.current.scrollHeight;
+        }
+    }, []);
+    
+    useEffect(() => {
+        if (!isViewingPastChapter) {
+            setTimeout(scrollToBottom, 100);
+        }
+    }, [getCurrentChapter().scenes.length, isViewingPastChapter, scrollToBottom]);
 
     const handleCustomActionSubmit = useCallback(() => {
         if (customAction.trim()) {
