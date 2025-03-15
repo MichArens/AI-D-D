@@ -69,9 +69,9 @@ const GameScreen: React.FC<GameScreenProps> = ({
 
     const handleChapterClick = (index: number) => {
         if (loading) {
-          return; // Prevent navigation if story is loading
+          return;
         }
-        // handleViewChapter(index); TODO
+        setViewingChapterIndex(index);
     };
 
     const formatChapterTitle = useCallback((title: string) => {

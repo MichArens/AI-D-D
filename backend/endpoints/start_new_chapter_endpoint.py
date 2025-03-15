@@ -35,10 +35,10 @@ async def start_new_chapter(request: NewChapterRequest)-> NewChapterResponse:
         next_chapter_index: int = 0 if is_game_start else request.gameState.arcs[-1].chapters[-1].index + 1
         logger.info(f"Starting new chapter is game start: {is_game_start}, is arc start: {is_arc_start}")
         if is_arc_start:
-            generated_chapter_title: Optional[str] = None if is_game_start else request.gameState.arcs[-1].chapters[-1].title
+            generated_chapter_title: Optional[str] = None if is_game_start else request.newChapterTitle
             return await _create_arc_start_chapter(request.gameState.settings, request.gameState.characters, next_player_index, next_chapter_index, generated_chapter_title)
 
-        return await _create_mid_arc_chapter(request.gameState.settings, request.gameState.arcs[-1], request.gameState.characters, next_player_index, next_chapter_index, request.gameState.arcs[-1].chapters[-1].title)
+        return await _create_mid_arc_chapter(request.gameState.settings, request.gameState.arcs[-1], request.gameState.characters, next_player_index, next_chapter_index, request.newChapterTitle)
     except Exception as e:
         logger.error(f"Error in start_new_chapter: {e}")
         logger.error(traceback.format_exc())
@@ -203,14 +203,14 @@ def _create_mid_arc_new_chapter_prompt(current_arc: StroyArc, party_description:
 def _create_current_arc_summary(current_arc: StroyArc):
     #TODO maybe reference the whole previous chapter text and not only the summary
     chapters_summary: str = ""
-    previous_chapters: List[StoryChapter] = current_arc.chapters[:len(current_arc.chapters) - 1]
-    for index, chapter in enumerate(previous_chapters):
+    
+    for index, chapter in enumerate(current_arc.chapters):
         chapters_summary += f"* Chapter No.{index+1} \"{chapter.title}\": "
         if chapter.summary:
             chapters_summary += f" {chapter.summary}\n"
 
     return f"""
-        The party is currently in an adventure arc with {len(previous_chapters)} previous chapters.
+        The party is currently in an adventure arc with {len(current_arc.chapters)} previous chapters.
         Their summary is as follows:
         {chapters_summary}
         """
