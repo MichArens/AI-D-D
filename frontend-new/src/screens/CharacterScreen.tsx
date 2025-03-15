@@ -125,13 +125,11 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
         setError(null);
         
         try {
-          // Generate icons for all characters if images are enabled
-          const updatedCharacters = [...gameState.characters];
           if (gameState.settings.enableImages) {
-            for (let i = 0; i < updatedCharacters.length; i++) {
-              const character = updatedCharacters[i];
+            for (let i = 0; i < gameState.characters.length; i++) {
+              const character = gameState.characters[i];
               const { icon } = await api.generateCharacterIcon(character);
-              updatedCharacters[i] = { ...character, icon };
+              gameState.characters[i].icon = icon;
             }
           }
           
@@ -143,8 +141,7 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
             throw new Error("Invalid response from server when starting game");
           }
           
-          const newChapter = response.newChapter;
-          addNewChapter(newChapter);
+          addNewChapter(response.newChapter);
           console.log("Start game finish ", gameState);
           setScreen('game');
         } catch (err: any) {
