@@ -2,15 +2,20 @@ import logging
 import random
 import traceback
 
+from pydantic import BaseModel
+from models import Race, CharacterClass   
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class GenerateCharacterOptionsResponse(BaseModel):
+    races: list[Race]
+    classes: list[CharacterClass]
 
 async def generate_character_options():
     """Generate available races and classes for this game session"""
     try:
         logger.info("Generating character options")
-        from models import Race, CharacterClass
         
         # Ensure we have Race and CharacterClass defined
         if not list(Race) or not list(CharacterClass):
@@ -27,10 +32,10 @@ async def generate_character_options():
         available_races = random.sample(list(Race), min(5, len(Race)))
         available_classes = random.sample(list(CharacterClass), min(5, len(CharacterClass)))
         
-        result = {
-            "races": [race.value for race in available_races],
-            "classes": [cls.value for cls in available_classes]
-        }
+        result = GenerateCharacterOptionsResponse(
+            races = [race.value for race in available_races],
+            classes=[cls.value for cls in available_classes]
+        )
         
         logger.info(f"Generated options: {result}")
         return result
@@ -39,7 +44,7 @@ async def generate_character_options():
         logger.error(f"Error generating character options: {e}")
         logger.error(traceback.format_exc())
         # Return default options instead of failing
-        return {
-            "races": ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
-            "classes": ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
-        }
+        return GenerateCharacterOptionsResponse(
+            races = ["Human", "Elf", "Dwarf", "Orc", "Halfling"],
+            classes = ["Warrior", "Mage", "Rogue", "Cleric", "Bard"]
+        )

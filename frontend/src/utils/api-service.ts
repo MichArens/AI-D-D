@@ -1,7 +1,9 @@
+import { IGameState, IPlayerCharacter, IStoryChapter, IStoryScene } from "../types/game-types";
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // Improve error handling in API calls
-const callApi = async (endpoint, method = 'GET', body = null) => {
+const callApi = async (endpoint: string, method: string = 'GET', body: any = null) => {
   try {
     console.log(`[API] Calling ${method} ${API_BASE_URL}/${endpoint}`, body);
     
@@ -20,7 +22,7 @@ const callApi = async (endpoint, method = 'GET', body = null) => {
     // Handle non-OK responses
     if (!response.ok) {
       let errorDetail = `HTTP error: ${response.status}`;
-      let errorData = {};
+      let errorData: any = {};
       
       try {
         errorData = await response.json();
@@ -30,7 +32,7 @@ const callApi = async (endpoint, method = 'GET', body = null) => {
       }
       
       // Create better error message
-      const error = new Error(`API Error: ${errorDetail}`);
+      const error: any = new Error(`API Error: ${errorDetail}`);
       error.status = response.status;
       error.responseData = errorData;
       throw error;
@@ -53,7 +55,7 @@ const callApi = async (endpoint, method = 'GET', body = null) => {
 };
 
 export const api = {
-  async getCharacterOptions() {
+  async getCharacterOptions(): Promise<{races: string[], classes: string[]}> {
     try {
       console.log('[API] Getting character options');
       // Handle potential empty response
@@ -76,23 +78,19 @@ export const api = {
     }
   },
   
-  async generateCharacterIcon(character) {
+  async generateCharacterIcon(character: IPlayerCharacter): Promise<{icon: string}> {
     return callApi('generate-character-icon', 'POST', { character });
   },
-  
-  async startGame(gameState) {
-    return callApi('start-game', 'POST', gameState);
+
+  async takeAction(gameState: IGameState, customAction?: string): Promise<{scene: IStoryScene, nextChapterTitle?: string, chapterSummary?: string, chapterSummaryImage?: string, chapterSummaryAudioData?: string}> {
+    return callApi('take-action', 'POST', { gameState, customAction });
   },
   
-  async takeAction(gameState, choiceId, customAction = null) {
-    return callApi('take-action', 'POST', { gameState, choiceId, customAction });
-  },
-  
-  async getModels() {
+  async getModels(): Promise<{models: string[]}> {
     return callApi('models');
   },
   
-  async startNewChapter(gameState, nextChapterTitle) {
+  async startNewChapter(gameState: IGameState, newChapterTitle?: string): Promise<{newChapter: IStoryChapter}> {
     try {
       // Clean up gameState to make it more compatible with backend
       const cleanGameState = JSON.parse(JSON.stringify(gameState));
@@ -100,7 +98,7 @@ export const api = {
       // Make sure data matches the expected format for Pydantic model
       const requestData = {
         gameState: cleanGameState,
-        nextChapterTitle: nextChapterTitle || "The Next Chapter"
+        newChapterTitle: newChapterTitle 
       };
       
       return await callApi('start-new-chapter', 'POST', requestData);
@@ -114,7 +112,7 @@ export const api = {
     return callApi('check-music', 'GET');
   },
   
-  async generateTTS(text, voice = 'bm_george') {
+  async generateTTS(text: string, voice = 'bm_george'): Promise<string> {
     return callApi('generate-tts', 'POST', { text, voice });
   }
 };

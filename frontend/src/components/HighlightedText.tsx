@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 // Helper function to split text into sentences with more natural breaks
-function splitIntoSentencesImproved(text) {
+function splitIntoSentencesImproved(text: string) {
   if (!text) return [];
   
   // Split text into sentences based on punctuation
@@ -36,7 +36,7 @@ function splitIntoSentencesImproved(text) {
 }
 
 // Calculate estimated sentence durations based on content
-function calculateSentenceDurations(sentences, totalDuration) {
+function calculateSentenceDurations(sentences: string[], totalDuration: number) {
   if (!sentences.length) return [];
   if (!totalDuration) return sentences.map(() => 2000); // Default 2 seconds per sentence
   
@@ -52,24 +52,32 @@ function calculateSentenceDurations(sentences, totalDuration) {
   });
 }
 
-const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
+interface HighlightedTextProps {
+    text: string,
+    isPlaying: boolean, 
+    isAITTS: boolean, 
+    audioRef: React.RefObject<HTMLAudioElement | null>
+}
+
+const HighlightedText: React.FC<HighlightedTextProps> = ({
+    text,
+    isPlaying, 
+    isAITTS, 
+    audioRef
+}) => {
   const [currentHighlight, setCurrentHighlight] = useState(-1);
-  const utteranceRef = useRef(null);
-  const sentencesRef = useRef([]);
-  const sentenceDurationsRef = useRef([]);
-  const intervalRef = useRef(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const sentenceDurationsRef = useRef<number[]>([]);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastProgressRef = useRef(0);
   const lastUpdateTimeRef = useRef(0);
   
   // Split text by sentences for AI TTS or words for browser TTS
-  const segments = isAITTS 
-    ? splitIntoSentencesImproved(text) // Use improved function
-    : text.split(/\s+/); // Split by words for web TTS
-  
-  // Cache the segments
-  useEffect(() => {
-    sentencesRef.current = isAITTS ? segments : segments;
-  }, [segments, isAITTS]);
+    const segments = useMemo(() => {
+        return isAITTS 
+            ? splitIntoSentencesImproved(text) // Use improved function
+            : text.split(/\s+/); // Split by words for web TTS
+    }, [text, isAITTS]);
   
   useEffect(() => {
     // Reset highlight when stopped
@@ -106,7 +114,7 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
         console.log("Using audio element for highlighting timing");
         
         // Get the total number of sentences
-        const sentenceCount = sentencesRef.current.length;
+        const sentenceCount = segments.length;
         
         // Initialize last update time
         lastUpdateTimeRef.current = Date.now();
@@ -122,7 +130,7 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
           console.log("Audio duration:", audioDuration);
           
           if (audioDuration && !isNaN(audioDuration) && audioDuration > 0) {
-            const durations = calculateSentenceDurations(sentencesRef.current, audioDuration);
+            const durations = calculateSentenceDurations(segments, audioDuration);
             sentenceDurationsRef.current = durations;
             console.log("Calculated sentence durations:", durations);
           }
@@ -216,22 +224,22 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
         console.log("Using timer-based highlighting");
         
         let currentIndex = 0;
-        const sentenceCount = sentencesRef.current.length;
+        const sentenceCount = segments.length;
         
         // Algorithm to estimate reading time: ~275ms per word + 500ms per sentence
-        const estimateDuration = (sentence) => {
+        const estimateDuration = (sentence: string) => {
           const words = sentence.split(/\s+/).length;
           return Math.max(1000, (words * 275) + 500);
         };
         
         // Create an array of timings for each sentence
-        const sentenceDurations = sentencesRef.current.map(estimateDuration);
+        const sentenceDurations = segments.map(estimateDuration);
         console.log("Estimated sentence durations:", sentenceDurations);
         
         // Update current sentence using the calculated durations
         const updateHighlight = () => {
           if (currentIndex >= sentenceCount) {
-            clearTimeout(intervalRef.current);
+            intervalRef.current && clearTimeout(intervalRef.current);
             setCurrentHighlight(-1);
             return;
           }
@@ -310,7 +318,7 @@ const HighlightedText = ({ text, activeTTS, isPlaying, isAITTS, audioRef }) => {
   
   return (
     <p>
-      {segments.map((segment, index) => (
+      {segments.map((segment: string, index: number) => (
         <React.Fragment key={index}>
           <span 
             className={currentHighlight === index ? "highlighted-word" : ""}
