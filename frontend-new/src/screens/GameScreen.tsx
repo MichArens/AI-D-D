@@ -86,6 +86,10 @@ const GameScreen: React.FC<GameScreenProps> = ({
         setViewingChapterIndex(index);
     };
 
+    useEffect(() => {
+        stopTTS();
+    }, [viewingChapterIndex]);
+
     const formatChapterTitle = useCallback((title: string) => {
         if (!title || title.trim() === '') {
             return `Chapter ?`;
@@ -95,13 +99,84 @@ const GameScreen: React.FC<GameScreenProps> = ({
         return displayTitle;
     }, []);
 
-    const handleToggleTTS = async (index: number) => {
-       //TODO handleToggleTTS(index);
+    const stopTTS = useCallback(() => {
+        if (isPlayingTTS) {
+            if (gameState.settings.enableAITTS) {
+                if (audioRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current.currentTime = 0;
+                }
+            } else {
+                window.speechSynthesis.cancel();
+            }
+            setIsPlayingTTS(false);
+            setActiveSceneTTS(null);
+        }
+    }, [isPlayingTTS, audioRef.current]);
+    
+    const handleToggleTTS = async (sceneIndex: number) => {
+        try {
+            if (isPlayingTTS && activeSceneTTS === sceneIndex) {
+                stopTTS();
+                return;
+            } else {
+                if (isPlayingTTS) {
+                    stopTTS();
+                }
+                
+                setActiveSceneTTS(sceneIndex);
+                setIsPlayingTTS(true);
+                
+                if (gameState.settings.enableAITTS) {
+                    let audioData: string | undefined;
+                    if (isViewingPastChapter) {
+                        const chapter = getChapterByIndex(viewingChapterIndex);
+                        audioData = chapter?.summaryAudioData;
+                    } else {
+                        audioData = getCurrentChapter().scenes[sceneIndex].audioData;
+                    }
+    
+                    if (!audioData) throw new Error("No audio data available for this scene");
+
+                    if (audioRef.current) {
+                        audioRef.current.src = `data:audio/mp3;base64,${audioData}`;
+                        audioRef.current.onended = () => {
+                            setIsPlayingTTS(false);
+                            setActiveSceneTTS(null);
+                        };
+                        
+                        await audioRef.current.play();
+                    }
+                } else {
+                    let textToRead: string;
+                    if (isViewingPastChapter) {
+                        const chapter = getChapterByIndex(viewingChapterIndex);
+                        textToRead = chapter?.summary || "";
+                    } else {
+                        textToRead = getCurrentChapter().scenes[sceneIndex].text;
+                    }
+                    if (!textToRead) throw new Error("No text available for this scene");
+                    
+                    const utterance = new SpeechSynthesisUtterance(textToRead);
+                    utterance.rate = 0.9;
+                    utterance.onend = () => {
+                        setIsPlayingTTS(false);
+                        setActiveSceneTTS(null);
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to play audio:", err);
+            setIsPlayingTTS(false);
+            setActiveSceneTTS(null);
+        }
     };
 
     const handleStartNewChapter = useCallback(async () => {
         if (loading || !nextChapterTitle) return;
-    
+        
         setLoading(true);
         setError(null);
 
@@ -144,6 +219,7 @@ const GameScreen: React.FC<GameScreenProps> = ({
             addNewScene(response.scene);
             if (response.chapterSummary) getCurrentChapter().summary = response.chapterSummary;
             if (response.chapterSummaryImage) getCurrentChapter().summaryImage = response.chapterSummaryImage;
+            if (response.chapterSummaryAudioData) getCurrentChapter().summaryAudioData = response.chapterSummaryAudioData;
             
             if (response.nextChapterTitle) {
                 setNextChapterTitle(response.nextChapterTitle);
@@ -236,13 +312,13 @@ const GameScreen: React.FC<GameScreenProps> = ({
                    />
                    
                    <button 
-                     className={`tts-button ${isPlayingTTS ? 'tts-active' : ''}`}
+                     className={`tts-button ${isPlayingTTS && activeSceneTTS === viewingChapterIndex ? 'tts-active' : ''}`}
                      onClick={() => handleToggleTTS(viewingChapterIndex)}
-                     title={isPlayingTTS ? "Stop Narration" : "Play Narration"}
-                     aria-label={isPlayingTTS ? "Stop Narration" : "Play Narration"}
+                     title={isPlayingTTS && activeSceneTTS === viewingChapterIndex ? "Stop Narration" : "Play Narration"}
+                     aria-label={isPlayingTTS && activeSceneTTS === viewingChapterIndex ? "Stop Narration" : "Play Narration"}
                      disabled={loading}
                    >
-                     {isPlayingTTS ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                     {isPlayingTTS && activeSceneTTS === viewingChapterIndex ? <SpeakerMuteIcon /> : <SpeakerIcon />}
                    </button>
                  </div>
                  {getChapterByIndex(viewingChapterIndex)?.summaryImage && (
@@ -281,20 +357,20 @@ const GameScreen: React.FC<GameScreenProps> = ({
                       
                       <HighlightedText 
                           text={scene.text} 
-                          isPlaying={isPlayingTTS}
+                          isPlaying={isPlayingTTS && activeSceneTTS === index}
                           isAITTS={gameState.settings.enableAITTS}
                           audioRef={audioRef}
                       />
                       
                       {/* TTS Button */}
                       <button 
-                        className={`tts-button ${isPlayingTTS ? 'tts-active' : ''}`}
+                        className={`tts-button ${isPlayingTTS && activeSceneTTS === index ? 'tts-active' : ''}`}
                         onClick={() => handleToggleTTS(index)}
-                        title={isPlayingTTS ? "Stop Narration" : "Play Narration"}
-                        aria-label={isPlayingTTS ? "Stop Narration" : "Play Narration"}
+                        title={isPlayingTTS && activeSceneTTS === index ? "Stop Narration" : "Play Narration"}
+                        aria-label={isPlayingTTS && activeSceneTTS === index ? "Stop Narration" : "Play Narration"}
                         disabled={loading}
                       >
-                        {isPlayingTTS ? <SpeakerMuteIcon /> : <SpeakerIcon />}
+                        {isPlayingTTS && activeSceneTTS === index ? <SpeakerMuteIcon /> : <SpeakerIcon />}
                       </button>
                     </div>
                     {scene.image && (
@@ -342,7 +418,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
                  </div>
                  
                  <div className="action-choices">
-                   {/* Display "Start New Chapter" button if chapter is ready to end */}
                    {getCurrentChapter().scenes[getCurrentChapter().scenes.length - 1].choices.length === 0 ? (
                      <div className="new-chapter-container">
                        <h3>Chapter Complete</h3>

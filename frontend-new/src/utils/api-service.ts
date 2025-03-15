@@ -82,7 +82,7 @@ export const api = {
     return callApi('generate-character-icon', 'POST', { character });
   },
 
-  async takeAction(gameState: IGameState, customAction?: string): Promise<{scene: IStoryScene, nextChapterTitle?: string, chapterSummary?: string, chapterSummaryImage?: string}> {
+  async takeAction(gameState: IGameState, customAction?: string): Promise<{scene: IStoryScene, nextChapterTitle?: string, chapterSummary?: string, chapterSummaryImage?: string, chapterSummaryAudioData?: string}> {
     return callApi('take-action', 'POST', { gameState, customAction });
   },
   

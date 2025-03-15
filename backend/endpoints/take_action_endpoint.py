@@ -23,6 +23,7 @@ class TakeActionResponse(BaseModel):
     nextChapterTitle: Optional[str]
     chapterSummary: Optional[str]
     chapterSummaryImage: Optional[str]
+    chapterSummaryAudioData: Optional[str]
     
 async def take_action(request: ActionRequest)-> TakeActionResponse:
     """Process a player's action and generate the next story segment"""
@@ -195,7 +196,7 @@ async def _handle_chapter_end(
     short_summary_prompt: str = _generate_chapter_summary_prompt(chapter_story_summary, next_story_part)
     short_chapter_summary: str = await generate_text(short_summary_prompt, model)
     short_chapter_summary: str = short_chapter_summary.strip().strip('"').strip("'")
-    
+    chapter_summary_audio_data: Optional[str] = await maybe_generate_tts(short_chapter_summary, settings.enableAITTS)
     chapter_summary_image = await generate_appropriate_image(
         settings, 
         ImageContextEnum.CHAPTER_SUMMARY, 
@@ -207,18 +208,19 @@ async def _handle_chapter_end(
         ImageContextEnum.STORY_UPDATE, 
         next_story_part
     )
-    audio_data: Optional[str] = await maybe_generate_tts(next_story_part, settings.enableAITTS)
+    next_scene_audio_data: Optional[str] = await maybe_generate_tts(next_story_part, settings.enableAITTS)
     
     response = TakeActionResponse(
         nextChapterTitle=next_chapter_title,
         chapterSummary=short_chapter_summary,
         chapterSummaryImage=chapter_summary_image,
+        chapterSummaryAudioData=chapter_summary_audio_data,
         scene=StoryScene(
             text=next_story_part,
             image=image_base64,
             activeCharacterIndex=next_player_index,
             chosenAction=None,
-            audioData=audio_data,
+            audioData=next_scene_audio_data,
             choices=[]
         )
     )

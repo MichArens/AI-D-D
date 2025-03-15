@@ -55,6 +55,7 @@ class StoryChapter(BaseModel):
     title: str
     summary: Optional[str] = None
     summaryImage: Optional[str] = None
+    summaryAudioData: Optional[str] = None
     scenes: List[StoryScene]
     index: int
 

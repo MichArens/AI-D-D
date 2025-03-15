@@ -35,6 +35,7 @@ export  interface IStoryChapter {
     title: string;
     summary?: string;
     summaryImage?: string;
+    summaryAudioData?: string;
     scenes: IStoryScene[];
     index: number;
 }
