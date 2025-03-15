@@ -4,6 +4,8 @@ import { IGameState, IPlayerCharacter, IStoryArc, IStoryChapter, IStoryScene } f
 import HighlightedText from '../components/HighlightedText';
 import SpeakerMuteIcon from '../components/SpeakerMuteIcon';
 import SpeakerIcon from '../components/SpeakerIcon';
+import HostWebsocketService from '../utils/websocket/host/host-websocket-service';
+import { HostMessageType } from '../utils/websocket/host/host-message-types';
 
 interface GameScreenProps {
   gameState: IGameState;
@@ -30,7 +32,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
   addNewChapter,
   addNewScene,
 }) => {
-    // State for custom action input
     const [showCustomInput, setShowCustomInput] = useState(false);
     const [customAction, setCustomAction] = useState('');
     const [activeSceneTTS, setActiveSceneTTS] = useState<number | null>(null);
@@ -45,7 +46,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
     const audioRef = useRef<HTMLAudioElement>(null);
 
     useEffect(() => {
-        //TODO check how behaves
         if (storyRef.current) {
           storyRef.current.scrollTop = storyRef.current.scrollHeight;
         }
@@ -231,10 +231,55 @@ const GameScreen: React.FC<GameScreenProps> = ({
             setLoading(false);
         }
     };
-    
-   return (
+
+    useEffect(() => { 
+        console.log("Effect ran");
+        if (gameState.sessionCode) {
+            HostWebsocketService.getInstance().on(HostMessageType.PLAYER_ACTION, handleRemotePlayerAction);
+        }
+        
+        return () => {
+            console.log("Cleanup ran");
+            // if (gameState.sessionCode) {
+            //     HostWebsocketService.getInstance().off(HostMessageType.PLAYER_ACTION, handleRemotePlayerAction);
+            //     HostWebsocketService.getInstance().disconnect();
+            // }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isViewingPastChapter) {
+            setTimeout(scrollToBottom, 100);
+        }
+        updateRemotePlayers();
+    }, [getCurrentChapter().scenes.length, isViewingPastChapter, scrollToBottom]);
+
+    const updateRemotePlayers = useCallback(() => {
+        if (gameState.sessionCode) {
+            console.log("Updating remote players...", gameState.sessionCode);
+            const currentScene = getCurrentScene();
+            if (currentScene) {
+                HostWebsocketService.getInstance().updateGameState(currentScene);
+            }
+        }
+    }, [getCurrentScene, gameState.sessionCode]);
+
+    const handleRemotePlayerAction = (data: any) => {
+        const { player_index, action } = data.data;
+        console.log(`Remote player ${player_index} chose action: ${action}`);
+        
+        // Get the character assigned to this remote player
+        const activeCharacter = getCharacterByIndex(player_index);
+        if (activeCharacter) {
+          console.log(`Character ${activeCharacter.name} is taking action: ${action}`);
+        }
+        
+        // Process the action
+        handleActionChoice(action);
+    };
+
+    return (
        <div className="game-screen">
-         {/* Custom action modal */}
          {showCustomInput && (
            <div className="custom-action-modal">
              <div className="modal-content">
@@ -266,7 +311,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
            </div>
          )}
          
-         {/* Sticky chapter header at top of screen - always show even if null with a fallback */}
          <div className="sticky-chapter-header">
            <h2>
              {viewingChapter ? (
@@ -299,7 +343,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
            </div>
    
            <div className="story-container" ref={storyRef}>
-             {/* Show chapter summary view when viewing past chapter */}
              {isViewingPastChapter ? (
                <div className="chapter-summary-view">
                  <h3>Chapter Summary</h3>
@@ -329,16 +372,13 @@ const GameScreen: React.FC<GameScreenProps> = ({
                </div>
              ): null}
              
-             {/* Show regular story progression when not in summary mode */}
              {!isViewingPastChapter && 
               getCurrentChapter().scenes.map((scene: IStoryScene, index: number) => {
-                // Generate a truly unique key for each segment
                 const segmentKey = `${getCurrentChapter().index}-${index}`;
                 const prevScene: IStoryScene | undefined = getCurrentChapter().scenes[index - 1];
                 return (
                   <div key={segmentKey} className="story-segment">
                     <div className="story-text">
-                      {/* Player action info */}
                       {prevScene && getCharacterByIndex(prevScene.activeCharacterIndex) && prevScene.chosenAction && (
                         <div className="player-action">
                           <div className="player-icon">
@@ -362,7 +402,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
                           audioRef={audioRef}
                       />
                       
-                      {/* TTS Button */}
                       <button 
                         className={`tts-button ${isPlayingTTS && activeSceneTTS === index ? 'tts-active' : ''}`}
                         onClick={() => handleToggleTTS(index)}
@@ -378,7 +417,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
                         <img 
                           src={`data:image/png;base64,${scene.image}`} 
                           alt="Scene" 
-                          // Guaranteed unique key for image
                           key={`img-${segmentKey}-${Date.now()}`}
                         />
                       </div>
@@ -434,7 +472,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
                      <>
                        <h3>Choose Your Action:</h3>
                        
-                       {/* Show action buttons when not loading */}
                        {!loading &&
                         getCurrentScene().choices && (
                          <>
@@ -449,7 +486,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
                              </button>
                            ))}
                            
-                           {/* Add custom action button */}
                            <button 
                              className="action-button custom-action-button"
                              onClick={() => setShowCustomInput(true)}
@@ -462,7 +498,6 @@ const GameScreen: React.FC<GameScreenProps> = ({
                      </>
                    )}
                    
-                   {/* Enhanced loading indicator in action area */}
                    {loading && (
                      <div className="action-loading-container">
                        <div className="loading-spinner"></div>
@@ -493,14 +528,20 @@ const GameScreen: React.FC<GameScreenProps> = ({
          </div>
          
          {error && <div className="error-message">{error}</div>}
-         {/* Audio player for AI TTS (hidden) - improved configuration */}
+         {gameState.sessionCode && (
+            <div className="session-info">
+                <div className="session-code-display">
+                    Game Code: <span className="code-highlight">{gameState.sessionCode}</span>
+                </div>
+                <p className="session-info">Share this code with friends to join your game</p>
+            </div>
+         )}
          <audio 
             ref={audioRef}
             style={{ display: 'none' }} 
             controls={false}
             preload="auto"
             onError={() => {
-                // Prevent error messages on cleanup/manual stopping
                 console.log("Audio element error - handled");
             }}
         />

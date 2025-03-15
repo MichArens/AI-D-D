@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
@@ -11,7 +11,7 @@ from endpoints.generate_character_options_endpoint import generate_character_opt
 from endpoints.get_available_models_endpoint import get_available_models
 from endpoints.start_new_chapter_endpoint import start_new_chapter
 from endpoints.take_action_endpoint import take_action
-
+from endpoints.game_session_websocket import handle_websocket_connection
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,9 +45,10 @@ app.post("/api/take-action")(take_action)
 app.post("/api/start-new-chapter")(start_new_chapter)
 app.get("/api/check-music")(check_music)
 app.get("/api/models")(get_available_models)
-
-# Register the new TTS endpoint
 app.post("/api/generate-tts")(generate_tts_endpoint)
+
+# Register WebSocket endpoint for game sessions
+app.websocket("/ws/game-session")(handle_websocket_connection)
 
 if __name__ == "__main__":
     import uvicorn
