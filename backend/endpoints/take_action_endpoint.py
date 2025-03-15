@@ -5,10 +5,11 @@ from typing import List, Literal, Optional, Union
 from fastapi import HTTPException
 from pydantic import BaseModel
 from ai.text_ai_service import generate_text
+from utilities.tts_generation_utils import maybe_generate_tts
 from utilities.image_generation_utils import generate_appropriate_image
 from utilities.image_context_enum import ImageContextEnum
 from utilities.prompt_constants import PromptConstants
-from utilities.prompt_utils import generate_fallback_actions, get_dnd_master_description, maybe_generate_tts, parse_story_and_actions
+from utilities.prompt_utils import generate_fallback_actions, get_dnd_master_description, parse_story_and_actions
 from models import GameSettings, GameState, PlayerCharacter, StoryChapter, StoryScene, StroyArc
 
 logging.basicConfig(level=logging.INFO)

@@ -101,16 +101,4 @@ def generate_fallback_actions(character_name: Optional[str]=None, context: Liter
             {"id": 2, "text": f"{char_prefix} take a different approach" if char_prefix else "Search for valuable items or clues"}
         ]
 
-async def maybe_generate_tts(text: str, enable_tts=False):
-    """Generate TTS for text if enabled"""
-    if not enable_tts or not text:
-        return None
-    
-    try:
-        logger.info(f"Pre-generating TTS for text of length {len(text)}")
-        audio_data = await generate_tts(text, "bm_george")
-        return audio_data
-    except Exception as e:
-        logger.error(f"Failed to generate TTS: {e}")
-        return None
     
