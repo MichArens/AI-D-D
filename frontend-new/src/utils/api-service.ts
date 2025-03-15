@@ -90,7 +90,7 @@ export const api = {
     return callApi('models');
   },
   
-  async startNewChapter(gameState: IGameState, nextChapterTitle?: string): Promise<{newChapter: IStoryChapter}> {
+  async startNewChapter(gameState: IGameState, newChapterTitle?: string): Promise<{newChapter: IStoryChapter}> {
     try {
       // Clean up gameState to make it more compatible with backend
       const cleanGameState = JSON.parse(JSON.stringify(gameState));
@@ -98,7 +98,7 @@ export const api = {
       // Make sure data matches the expected format for Pydantic model
       const requestData = {
         gameState: cleanGameState,
-        nextChapterTitle: nextChapterTitle 
+        newChapterTitle: newChapterTitle 
       };
       
       return await callApi('start-new-chapter', 'POST', requestData);
