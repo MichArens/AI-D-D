@@ -17,7 +17,6 @@ const JoinGameScreen: React.FC<JoinGameScreenProps> = ({ setScreen }) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [connected, setConnected] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
   const [currentScene, setCurrentScene] = useState<IStoryScene | null>(null);
 
   const [customAction, setCustomAction] = useState<string>('');
@@ -207,10 +206,6 @@ const JoinGameScreen: React.FC<JoinGameScreenProps> = ({ setScreen }) => {
           </div>
           
           {error && <div className="error-message">{error}</div>}
-          
-          <div className="connection-status">
-            Status: {connectionStatus}
-          </div>
         </div>
       </div>
     );
