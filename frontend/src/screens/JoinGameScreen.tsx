@@ -47,13 +47,14 @@ const JoinGameScreen: React.FC<JoinGameScreenProps> = ({ setScreen }) => {
         PlayerWebsocketService.getInstance().off(PlayerMessageType.JOIN_SESSION_ERROR, handleError);
         PlayerWebsocketService.getInstance().off(PlayerMessageType.AVVAILABLE_CHARACTERS, handleAvailableCharacters);
         PlayerWebsocketService.getInstance().off(PlayerMessageType.CHARACTER_ASSIGNED, handleCharacterAssigned);
-        // PlayerWebsocketService.getInstance().disconnect();
+        PlayerWebsocketService.getInstance().disconnect();
     };
   }, []);
 
   const handleGameStateUpdate = (data: {data: {type: string, newScene: IStoryScene}}) => {
     console.log('Game state updated:', data);
     setCurrentScene(data.data.newScene);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -144,14 +145,16 @@ const JoinGameScreen: React.FC<JoinGameScreenProps> = ({ setScreen }) => {
         setShowCustomActionForm(true);
     } else {
         PlayerWebsocketService.getInstance().sendPlayerAction(action);
+        setLoading(true);
     }
   };
 
   const handleCustomActionSubmit = () => {
     if (customAction.trim()) {
         PlayerWebsocketService.getInstance().sendPlayerAction(customAction);
-      setCustomAction('');
-      setShowCustomActionForm(false);
+        setCustomAction('');
+        setShowCustomActionForm(false);
+        setLoading(true);
     }
   };
 
@@ -287,14 +290,14 @@ const JoinGameScreen: React.FC<JoinGameScreenProps> = ({ setScreen }) => {
         )}
         
         <div className="player-view">
+
           <div className="story-container player-story">
-            <h2>Game Story</h2>
             <div className="story-text">
               {currentScene?.text || "Waiting for the game to start..."}
             </div>
           </div>
           
-          {currentScene?.activeCharacterIndex == selectedCharacter?.playerIndex ? (
+          {currentScene && currentScene.activeCharacterIndex == selectedCharacter?.playerIndex && currentScene.choices.length > 0 ? (
             <div className="player-actions">
               <h3>Your Turn - Choose an Action</h3>
               
@@ -318,7 +321,7 @@ const JoinGameScreen: React.FC<JoinGameScreenProps> = ({ setScreen }) => {
             </div>
           ) : (
             <div className="waiting-message">
-              <p>Waiting for your turn...</p>
+              <p>{currentScene && currentScene.choices.length == 0 ? "Waiting for new chapter to begin..." : "Waiting for your turn..."}</p>
             </div>
           )}
           

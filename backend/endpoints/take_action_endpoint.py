@@ -286,7 +286,8 @@ async def _handle_mid_chapter(settings: GameSettings, story_part: str, actions: 
         ),
         nextChapterTitle=None,
         chapterSummary=None,
-        chapterSummaryImage=None
+        chapterSummaryImage=None,
+        chapterSummaryAudioData=None
     )
     
     return response

@@ -240,10 +240,10 @@ const GameScreen: React.FC<GameScreenProps> = ({
         
         return () => {
             console.log("Cleanup ran");
-            // if (gameState.sessionCode) {
-            //     HostWebsocketService.getInstance().off(HostMessageType.PLAYER_ACTION, handleRemotePlayerAction);
-            //     HostWebsocketService.getInstance().disconnect();
-            // }
+            if (gameState.sessionCode) {
+                HostWebsocketService.getInstance().off(HostMessageType.PLAYER_ACTION, handleRemotePlayerAction);
+                HostWebsocketService.getInstance().disconnect();
+            }
         };
     }, []);
 
@@ -265,13 +265,15 @@ const GameScreen: React.FC<GameScreenProps> = ({
     }, [getCurrentScene, gameState.sessionCode]);
 
     const handleRemotePlayerAction = (data: any) => {
+        if (loading) return;
+        
         const { player_index, action } = data.data;
         console.log(`Remote player ${player_index} chose action: ${action}`);
         
         // Get the character assigned to this remote player
         const activeCharacter = getCharacterByIndex(player_index);
         if (activeCharacter) {
-          console.log(`Character ${activeCharacter.name} is taking action: ${action}`);
+            console.log(`Character ${activeCharacter.name} is taking action: ${action}`);
         }
         
         // Process the action

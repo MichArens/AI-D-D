@@ -74,6 +74,7 @@ class GameSession:
     async def send_available_characters(self, websocket: WebSocket) -> None:
         """Send available characters to the player for selection"""
         try:
+            logger.info(f"Sending available characters to player {self.assigned_characters}")
             assigned_indices = set(self.assigned_characters.values())
             available_characters = []
             
@@ -284,7 +285,6 @@ async def handle_websocket_connection(websocket: WebSocket):
         logger.info("WebSocket disconnected")
         if session:
             if is_host:
-                await session.disconnect_host()
                 game_session_manager.remove_session(session.session_code)
             else:
                 await session.disconnect_player(websocket)
