@@ -49,4 +49,5 @@ export  interface IGameState {
     characters: IPlayerCharacter[];
     arcs: IStoryArc[];
     musicUrl?: string;
+    sessionCode?: string;
 }

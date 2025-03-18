@@ -5,6 +5,7 @@ import SetupScreen from './screens/SetupScreen';
 import CharacterScreen from './screens/CharacterScreen';
 import { useGameState } from './states/game-state';
 import GameScreen from './screens/GameScreen';
+import JoinGameScreen from './screens/JoinGameScreen';
 
 function App() {
     const [screen, setScreen] = React.useState<GameScreens>('setup');
@@ -49,6 +50,10 @@ function App() {
             addNewScene={addNewScene}
             />}
             
+            {screen === 'join' && <JoinGameScreen 
+            setScreen={setScreen}
+            />}
+
             {/* Background music player (hidden) */}
             {/* {gameState.musicUrl && gameState.settings.enableMusic && (
             <audio 

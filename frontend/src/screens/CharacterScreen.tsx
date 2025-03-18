@@ -1,7 +1,9 @@
-import React, { use, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GameScreens } from '../types/game-screens';
 import { api } from '../utils/api-service';
 import { IGameState, IPlayerCharacter, IStoryChapter } from '../types/game-types';
+import HostWebsocketService from '../utils/websocket/host/host-websocket-service';
+import { HostMessageType } from '../utils/websocket/host/host-message-types';
 
 interface CharacterScreenProps {
   gameState: IGameState;
@@ -19,6 +21,7 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [characterOptions, setCharacterOptions] = useState<{races: string[], classes: string[]} | null>(null);
+    const [sessionCode, setSessionCode] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         const prepareCharacterOptions = async () => {
@@ -64,6 +67,22 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
         prepareCharacterOptions();
     }, []);
 
+    useEffect(() => {
+        HostWebsocketService.getInstance().onOpen = () => {
+            console.log("Host websocket connected");
+            HostWebsocketService.getInstance().createSession();
+        };
+        HostWebsocketService.getInstance().on(HostMessageType.SESSION_CREATED, handleSessionCreated);
+        HostWebsocketService.getInstance().connect();
+        return () => {
+            HostWebsocketService.getInstance().off(HostMessageType.SESSION_CREATED, handleSessionCreated);
+        };
+    }, []);
+
+    const handleSessionCreated = (data: {session_code: string}) => {
+        setSessionCode(data.session_code);
+    }
+
     const getRandomItem = (array: any[]) => {
         if (!array || array.length === 0) return "";
         return array[Math.floor(Math.random() * array.length)];
@@ -79,9 +98,7 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
       // Auto-assign random attributes when character options become available
       useEffect(() => {
         if (characterOptions?.races?.length && characterOptions?.classes?.length) {
-          // Only proceed if we have options available
           const updatedCharacters = gameState.characters.map(character => {
-            // Only assign random values for empty fields
             const updatedCharacter = { ...character };
             
             if (!updatedCharacter.race) {
@@ -103,7 +120,6 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
             return updatedCharacter;
           });
           
-          // Update the game state with our randomly generated characters
           updateCharacters(updatedCharacters);
         }
     }, [characterOptions, gameState.characters.length]);
@@ -125,30 +141,33 @@ const CharacterScreen: React.FC<CharacterScreenProps> = ({
         setError(null);
         
         try {
-          if (gameState.settings.enableImages) {
-            for (let i = 0; i < gameState.characters.length; i++) {
-              const character = gameState.characters[i];
-              const { icon } = await api.generateCharacterIcon(character);
-              gameState.characters[i].icon = icon;
+            console.log("Game session created with code:", sessionCode);
+            gameState.sessionCode = sessionCode;
+          
+            HostWebsocketService.getInstance().updateCharacters(gameState.characters);
+          
+            if (gameState.settings.enableImages) {
+                for (let i = 0; i < gameState.characters.length; i++) {
+                    const character = gameState.characters[i];
+                    const { icon } = await api.generateCharacterIcon(character);
+                    gameState.characters[i].icon = icon;
+                }
             }
-          }
           
-
-          // Start the game with the first chapter
-          const response = await api.startNewChapter(gameState);
-          
-          if (!response || !response.newChapter) {
-            throw new Error("Invalid response from server when starting game");
-          }
-          
-          addNewChapter(response.newChapter);
-          console.log("Start game finish ", gameState);
-          setScreen('game');
+            const response = await api.startNewChapter(gameState);
+            
+            if (!response || !response.newChapter) {
+                throw new Error("Invalid response from server when starting game");
+            }
+            
+            addNewChapter(response.newChapter);
+            console.log("Start game finish ", gameState);
+            setScreen('game');
         } catch (err: any) {
-          console.error("Start game error:", err);
-          setError('Failed to start game. Please try again. ' + err.message);
+            console.error("Start game error:", err);
+            setError('Failed to start game. Please try again. ' + err.message);
         } finally {
-          setLoading(false);
+            setLoading(false);
         }
     };
 
